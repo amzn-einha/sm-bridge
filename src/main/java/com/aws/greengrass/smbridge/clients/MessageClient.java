@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge.clients;
+package com.aws.greengrass.smbridge.clients;
 
-import com.aws.greengrass.mqttbridge.Message;
+import com.aws.greengrass.smbridge.Message;
 
 import java.util.Set;
 import java.util.function.Consumer;

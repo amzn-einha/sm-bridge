@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge.clients;
+package com.aws.greengrass.smbridge.clients;
 
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.mqttbridge.MQTTBridge;
-import com.aws.greengrass.mqttbridge.Message;
-import com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore;
+import com.aws.greengrass.smbridge.SMBridge;
+import com.aws.greengrass.smbridge.Message;
+import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.util.Coerce;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -99,7 +99,7 @@ public class MQTTClient implements MessageClient {
         this.dataStore = new MemoryPersistence();
         this.serverUri = Coerce.toString(topics.findOrDefault(DEFAULT_BROKER_URI,
                 KernelConfigResolver.PARAMETERS_CONFIG_KEY, BROKER_URI_KEY));
-        this.clientId = Coerce.toString(topics.findOrDefault(MQTTBridge.SERVICE_NAME,
+        this.clientId = Coerce.toString(topics.findOrDefault(SMBridge.SERVICE_NAME,
                 KernelConfigResolver.PARAMETERS_CONFIG_KEY, CLIENT_ID_KEY));
         this.mqttClientKeyStore = mqttClientKeyStore;
         this.mqttClientKeyStore.listenToUpdates(this::reset);

@@ -1,6 +1,6 @@
-## AWS Greengrass MQTT Bridge
+## AWS Greengrass Stream Manager Bridge
 
-MQTT Bridge is a Greengrass component that manages the communications between MQTT broker and the rest of Greengrass system, specifically PubSub and MQTT Proxy.
+Stream Manager Bridge is a Greengrass component that automates MQTT message ingestion to Stream Manager streams. 
 
 ## Security
 

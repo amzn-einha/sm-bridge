@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge.auth;
+package com.aws.greengrass.smbridge.auth;
 
 import com.aws.greengrass.certificatemanager.CertificateManager;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
@@ -31,8 +31,8 @@ import java.util.function.Consumer;
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLSocketFactory;
 
-import static com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore.DEFAULT_KEYSTORE_PASSWORD;
-import static com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore.KEY_ALIAS;
+import static com.aws.greengrass.smbridge.auth.MQTTClientKeyStore.DEFAULT_KEYSTORE_PASSWORD;
+import static com.aws.greengrass.smbridge.auth.MQTTClientKeyStore.KEY_ALIAS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;

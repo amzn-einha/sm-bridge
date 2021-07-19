@@ -3,9 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge;
+package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.builtin.services.pubsub.PubSubIPCAgent;
 import com.aws.greengrass.certificatemanager.CertificateManager;
 import com.aws.greengrass.certificatemanager.DCMService;
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
@@ -15,8 +14,8 @@ import com.aws.greengrass.dependency.State;
 import com.aws.greengrass.lifecyclemanager.GlobalStateChangeListener;
 import com.aws.greengrass.lifecyclemanager.GreengrassService;
 import com.aws.greengrass.lifecyclemanager.Kernel;
-import com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore;
-import com.aws.greengrass.mqttbridge.clients.MQTTClient;
+import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
+import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import com.aws.greengrass.testcommons.testutilities.GGServiceTestUtil;
@@ -58,7 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, GGExtension.class})
-public class MQTTBridgeTest extends GGServiceTestUtil {
+public class SMBridgeTest extends GGServiceTestUtil {
     private static final long TEST_TIME_OUT_SEC = 30L;
 
     private Kernel kernel;
@@ -92,7 +91,7 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
         kernel.parseArgs("-r", rootDir.toAbsolutePath().toString(), "-i",
                 getClass().getResource(configFileName).toString());
         listener = (GreengrassService service, State was, State newState) -> {
-            if (service.getName().equals(MQTTBridge.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
+            if (service.getName().equals(SMBridge.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
                 bridgeRunning.countDown();
             }
         };
@@ -110,11 +109,11 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
     @Test
     void GIVEN_Greengrass_with_mqtt_bridge_WHEN_valid_mqttTopicMapping_updated_THEN_mapping_updated() throws Exception {
         startKernelWithConfig("config.yaml");
-        TopicMapping topicMapping = ((MQTTBridge) kernel.locate(MQTTBridge.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));
 
-        kernel.locate(MQTTBridge.SERVICE_NAME).getConfig()
-                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, MQTTBridge.MQTT_TOPIC_MAPPING).withValue("[\n"
+        kernel.locate(SMBridge.SERVICE_NAME).getConfig()
+                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, SMBridge.MQTT_TOPIC_MAPPING).withValue("[\n"
                 + "  {\"SourceTopic\": \"mqtt/topic\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic\", \"DestTopicType\": \"IotCore\"},\n"
                 + "  {\"SourceTopic\": \"mqtt/topic2\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/pubsub/topic\", \"DestTopicType\": \"Pubsub\"},\n"
                 + "  {\"SourceTopic\": \"mqtt/topic3\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic2\", \"DestTopicType\": \"IotCore\"}\n"
@@ -129,7 +128,7 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
     void GIVEN_Greengrass_with_mqtt_bridge_WHEN_valid_mapping_provided_in_config_THEN_mapping_populated()
             throws Exception {
         startKernelWithConfig("config_with_mapping.yaml");
-        TopicMapping topicMapping = ((MQTTBridge) kernel.locate(MQTTBridge.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
 
         assertThat(() -> topicMapping.getMapping().size(), EventuallyLambdaMatcher.eventuallyEval(is(3)));
         List<TopicMapping.MappingEntry> expectedMapping = new ArrayList<>();
@@ -147,11 +146,11 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
     void GIVEN_Greengrass_with_mqtt_bridge_WHEN_empty_mqttTopicMapping_updated_THEN_mapping_not_updated()
             throws Exception {
         startKernelWithConfig("config.yaml");
-        TopicMapping topicMapping = ((MQTTBridge) kernel.locate(MQTTBridge.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));
 
-        kernel.locate(MQTTBridge.SERVICE_NAME).getConfig()
-                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, MQTTBridge.MQTT_TOPIC_MAPPING).withValue("");
+        kernel.locate(SMBridge.SERVICE_NAME).getConfig()
+                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, SMBridge.MQTT_TOPIC_MAPPING).withValue("");
         // Block until subscriber has finished updating
         kernel.getContext().runOnPublishQueueAndWait(() -> {
         });
@@ -162,14 +161,14 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
     void GIVEN_Greengrass_with_mqtt_bridge_WHEN_invalid_mqttTopicMapping_updated_THEN_mapping_not_updated()
             throws Exception {
         startKernelWithConfig("config.yaml");
-        TopicMapping topicMapping = ((MQTTBridge) kernel.locate(MQTTBridge.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));
 
         kernel.getContext().removeGlobalStateChangeListener(listener);
         CountDownLatch bridgeErrored = new CountDownLatch(1);
 
         GlobalStateChangeListener listener = (GreengrassService service, State was, State newState) -> {
-            if (service.getName().equals(MQTTBridge.SERVICE_NAME) && service.getState().equals(State.ERRORED)) {
+            if (service.getName().equals(SMBridge.SERVICE_NAME) && service.getState().equals(State.ERRORED)) {
                 bridgeErrored.countDown();
             }
         };
@@ -177,8 +176,8 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
         kernel.getContext().addGlobalStateChangeListener(listener);
 
         // Updating with invalid mapping (Providing type as Pubsub-Invalid)
-        kernel.locate(MQTTBridge.SERVICE_NAME).getConfig()
-                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, MQTTBridge.MQTT_TOPIC_MAPPING).withValue("[\n"
+        kernel.locate(SMBridge.SERVICE_NAME).getConfig()
+                .find(KernelConfigResolver.PARAMETERS_CONFIG_KEY, SMBridge.MQTT_TOPIC_MAPPING).withValue("[\n"
                 + "  {\"SourceTopic\": \"mqtt/topic\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic\", \"DestTopicType\": \"IotCore\"},\n"
                 + "  {\"SourceTopic\": \"mqtt/topic2\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": "
                 + "\"/test/pubsub/topic\", \"DestTopicType\": \"Pubsub-Invalid\"},\n"
@@ -194,23 +193,22 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
 
     @Test
     void GIVEN_Greengrass_with_mqtt_bridge_WHEN_CAs_updated_THEN_KeyStore_updated() throws Exception {
-        serviceFullName = MQTTBridge.SERVICE_NAME;
+        serviceFullName = SMBridge.SERVICE_NAME;
         initializeMockedConfig();
         TopicMapping mockTopicMapping = mock(TopicMapping.class);
         MessageBridge mockMessageBridge = mock(MessageBridge.class);
-        PubSubIPCAgent mockPubSubIPCAgent = mock(PubSubIPCAgent.class);
         Kernel mockKernel = mock(Kernel.class);
         MQTTClientKeyStore mockMqttClientKeyStore = mock(MQTTClientKeyStore.class);
-        MQTTBridge mqttBridge;
+        SMBridge SMBridge;
         try (MqttClient mockIotMqttClient = mock(MqttClient.class)) {
-            mqttBridge = new MQTTBridge(config, mockTopicMapping, mockMessageBridge, mockPubSubIPCAgent,
+            SMBridge = new SMBridge(config, mockTopicMapping, mockMessageBridge,
                     mockIotMqttClient, mockKernel, mockMqttClientKeyStore);
         }
 
         when(config.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn("tcp://localhost:8883");
         when(config.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
-                eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(MQTTBridge.SERVICE_NAME);
+                eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(SMBridge.SERVICE_NAME);
 
         DCMService mockDCMService = mock(DCMService.class);
         when(mockKernel.locate(DCMService.DCM_SERVICE_NAME)).thenReturn(mockDCMService);
@@ -218,20 +216,20 @@ public class MQTTBridgeTest extends GGServiceTestUtil {
         when(mockDCMService.getConfig()).thenReturn(mockDCMConfig);
 
         Topic caTopic = Topic.of(context, "authorities", Arrays.asList("CA1", "CA2"));
-        when(mockDCMConfig.lookup(MQTTBridge.RUNTIME_STORE_NAMESPACE_TOPIC, DCMService.CERTIFICATES_KEY,
+        when(mockDCMConfig.lookup(SMBridge.RUNTIME_STORE_NAMESPACE_TOPIC, DCMService.CERTIFICATES_KEY,
                 DCMService.AUTHORITIES_TOPIC)).thenReturn(caTopic);
-        mqttBridge.startup();
-        mqttBridge.shutdown();
+        SMBridge.startup();
+        SMBridge.shutdown();
         ArgumentCaptor<List<String>> caListCaptor = ArgumentCaptor.forClass(List.class);
         verify(mockMqttClientKeyStore).updateCA(caListCaptor.capture());
         assertThat(caListCaptor.getValue(), is(Arrays.asList("CA1", "CA2")));
 
         caTopic = Topic.of(context, "authorities", Collections.emptyList());
-        when(mockDCMConfig.lookup(MQTTBridge.RUNTIME_STORE_NAMESPACE_TOPIC, DCMService.CERTIFICATES_KEY,
+        when(mockDCMConfig.lookup(SMBridge.RUNTIME_STORE_NAMESPACE_TOPIC, DCMService.CERTIFICATES_KEY,
                 DCMService.AUTHORITIES_TOPIC)).thenReturn(caTopic);
         reset(mockMqttClientKeyStore);
-        mqttBridge.startup();
-        mqttBridge.shutdown();
+        SMBridge.startup();
+        SMBridge.shutdown();
         verify(mockMqttClientKeyStore, never()).updateCA(caListCaptor.capture());
     }
 }
