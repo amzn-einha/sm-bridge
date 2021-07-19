@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge;
+package com.aws.greengrass.smbridge;
 
 import com.aws.greengrass.builtin.services.pubsub.PubSubIPCAgent;
 import com.aws.greengrass.certificatemanager.DCMService;
@@ -15,12 +15,12 @@ import com.aws.greengrass.dependency.State;
 import com.aws.greengrass.lifecyclemanager.Kernel;
 import com.aws.greengrass.lifecyclemanager.PluginService;
 import com.aws.greengrass.lifecyclemanager.exceptions.ServiceLoadException;
-import com.aws.greengrass.mqttbridge.auth.CsrGeneratingException;
-import com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore;
-import com.aws.greengrass.mqttbridge.clients.IoTCoreClient;
-import com.aws.greengrass.mqttbridge.clients.MQTTClient;
-import com.aws.greengrass.mqttbridge.clients.MQTTClientException;
-import com.aws.greengrass.mqttbridge.clients.PubSubClient;
+import com.aws.greengrass.smbridge.auth.CsrGeneratingException;
+import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
+import com.aws.greengrass.smbridge.clients.IoTCoreClient;
+import com.aws.greengrass.smbridge.clients.MQTTClient;
+import com.aws.greengrass.smbridge.clients.MQTTClientException;
+import com.aws.greengrass.smbridge.clients.PubSubClient;
 import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.util.Coerce;
 import com.aws.greengrass.util.Utils;
@@ -33,8 +33,8 @@ import java.security.cert.CertificateException;
 import java.util.List;
 import javax.inject.Inject;
 
-@ImplementsService(name = MQTTBridge.SERVICE_NAME)
-public class MQTTBridge extends PluginService {
+@ImplementsService(name = SMBridge.SERVICE_NAME)
+public class SMBridge extends PluginService {
     public static final String SERVICE_NAME = "aws.greengrass.MqttBridge";
 
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
@@ -58,15 +58,15 @@ public class MQTTBridge extends PluginService {
      * @param mqttClientKeyStore KeyStore for MQTT Client
      */
     @Inject
-    public MQTTBridge(Topics topics, TopicMapping topicMapping, PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient,
-                      Kernel kernel, MQTTClientKeyStore mqttClientKeyStore) {
+    public SMBridge(Topics topics, TopicMapping topicMapping, PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient,
+                    Kernel kernel, MQTTClientKeyStore mqttClientKeyStore) {
         this(topics, topicMapping, new MessageBridge(topicMapping), pubSubIPCAgent, iotMqttClient, kernel,
              mqttClientKeyStore);
     }
 
-    protected MQTTBridge(Topics topics, TopicMapping topicMapping, MessageBridge messageBridge,
-                         PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient, Kernel kernel,
-                         MQTTClientKeyStore mqttClientKeyStore) {
+    protected SMBridge(Topics topics, TopicMapping topicMapping, MessageBridge messageBridge,
+                       PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient, Kernel kernel,
+                       MQTTClientKeyStore mqttClientKeyStore) {
         super(topics);
         this.topicMapping = topicMapping;
         this.kernel = kernel;

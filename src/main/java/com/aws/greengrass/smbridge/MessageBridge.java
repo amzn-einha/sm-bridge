@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge;
+package com.aws.greengrass.smbridge;
 
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.mqttbridge.clients.MessageClient;
-import com.aws.greengrass.mqttbridge.clients.MessageClientException;
+import com.aws.greengrass.smbridge.clients.MessageClient;
+import com.aws.greengrass.smbridge.clients.MessageClientException;
 import com.aws.greengrass.util.Pair;
 
 import java.util.ArrayList;
