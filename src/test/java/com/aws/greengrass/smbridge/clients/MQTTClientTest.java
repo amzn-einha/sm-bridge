@@ -66,18 +66,18 @@ public class MQTTClientTest {
 
     @Test
     void WHEN_call_mqtt_client_constructed_THEN_does_not_throw() {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn(SERVER_URI);
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         new MQTTClient(mockTopics, mockMqttClientKeyStore, mockMqttClient);
     }
 
     @Test
     void GIVEN_mqtt_client_WHEN_call_start_THEN_connected_to_broker() throws Exception {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn(SERVER_URI);
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         doNothing().when(mockMqttClient).connect(any(MqttConnectOptions.class));
         doNothing().when(mockMqttClient).setCallback(any());
@@ -89,9 +89,9 @@ public class MQTTClientTest {
 
     @Test
     void GIVEN_mqtt_client_WHEN_start_throws_exception_THEN_mqtt_client_exception_is_thrown() throws Exception {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn(SERVER_URI);
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         doThrow(new MqttException(0)).when(mockMqttClient).connect(any(MqttConnectOptions.class));
         MQTTClient mqttClient = new MQTTClient(mockTopics, mockMqttClientKeyStore, mockMqttClient);
@@ -171,9 +171,9 @@ public class MQTTClientTest {
 
     @Test
     void GIVEN_mqtt_client_and_subscribed_WHEN_receive_mqtt_message_THEN_routed_to_message_handler() throws Exception {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn(SERVER_URI);
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         MQTTClient mqttClient = new MQTTClient(mockTopics, mockMqttClientKeyStore, mockMqttClient);
         doNothing().when(mockMqttClient).connect(any(MqttConnectOptions.class));
@@ -212,37 +212,10 @@ public class MQTTClientTest {
     }
 
     @Test
-    void GIVEN_mqtt_client_and_subscribed_WHEN_published_message_THEN_routed_to_mqtt_broker() throws Exception {
-        MQTTClient mqttClient = new MQTTClient(mockTopics, mockMqttClientKeyStore, mockMqttClient);
-        Set<String> topics = new HashSet<>();
-        topics.add("mqtt/topic");
-        topics.add("mqtt/topic2");
-        mqttClient.updateSubscriptions(topics, mockMessageHandler);
-
-        byte[] messageFromPubsub = "message from pusub".getBytes();
-        byte[] messageFromIotCore = "message from iotcore".getBytes();
-
-        mqttClient.publish(new Message("mapped/topic/from/pubsub", messageFromPubsub));
-        mqttClient.publish(new Message("mapped/topic/from/iotcore", messageFromIotCore));
-
-        ArgumentCaptor<MqttMessage> messageCapture = ArgumentCaptor.forClass(MqttMessage.class);
-        ArgumentCaptor<String> topicStringArgumentCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockMqttClient, times(2)).publish(topicStringArgumentCaptor.capture(), messageCapture.capture());
-
-        MatcherAssert.assertThat(topicStringArgumentCaptor.getAllValues().get(0),
-                is(Matchers.equalTo("mapped/topic/from/pubsub")));
-        Assertions.assertArrayEquals(messageFromPubsub, messageCapture.getAllValues().get(0).getPayload());
-
-        MatcherAssert.assertThat(topicStringArgumentCaptor.getAllValues().get(1),
-                is(Matchers.equalTo("mapped/topic/from/iotcore")));
-        Assertions.assertArrayEquals(messageFromIotCore, messageCapture.getAllValues().get(1).getPayload());
-    }
-
-    @Test
     void GIVEN_mqtt_client_WHEN_connection_lost_THEN_attempts_to_reconnect_and_resubscribed() throws Exception {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn(SERVER_URI);
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         MQTTClient mqttClient = new MQTTClient(mockTopics, mockMqttClientKeyStore, mockMqttClient);
         doNothing().when(mockMqttClient).connect(any(MqttConnectOptions.class));
@@ -275,9 +248,9 @@ public class MQTTClientTest {
 
     @Test
     void GIVEN_mqtt_client_WHEN_keystore_updated_THEN_resets() throws Exception {
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.BROKER_URI_KEY))).thenReturn("ssl://localhost:8883");
-        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.PARAMETERS_CONFIG_KEY),
+        when(mockTopics.findOrDefault(any(), eq(KernelConfigResolver.CONFIGURATION_CONFIG_KEY),
                 eq(MQTTClient.CLIENT_ID_KEY))).thenReturn(CLIENT_ID);
         CertificateManager mockCertificateManager = mock(CertificateManager.class);
         MQTTClientKeyStore mqttClientKeyStore = new MQTTClientKeyStore(mockCertificateManager);

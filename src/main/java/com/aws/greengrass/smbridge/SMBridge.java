@@ -18,7 +18,6 @@ import com.aws.greengrass.smbridge.auth.CsrGeneratingException;
 import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.MQTTClientException;
-import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.util.Coerce;
 import com.aws.greengrass.util.Utils;
 import lombok.AccessLevel;
@@ -69,7 +68,7 @@ public class SMBridge extends PluginService {
 
     @Override
     public void install() {
-        this.config.lookup(KernelConfigResolver.PARAMETERS_CONFIG_KEY, MQTT_TOPIC_MAPPING).dflt("[]")
+        this.config.lookup(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, MQTT_TOPIC_MAPPING).dflt("[]")
                 .subscribe((why, newv) -> {
                     try {
                         String mapping = Coerce.toString(newv);
@@ -122,7 +121,6 @@ public class SMBridge extends PluginService {
         try {
             mqttClient = new MQTTClient(this.config, mqttClientKeyStore);
             mqttClient.start();
-            messageBridge.addOrReplaceMessageClient(TopicMapping.TopicType.LocalMqtt, mqttClient);
         } catch (MQTTClientException e) {
             serviceErrored(e);
             return;
@@ -133,7 +131,7 @@ public class SMBridge extends PluginService {
 
     @Override
     public void shutdown() {
-        messageBridge.removeMessageClient(TopicMapping.TopicType.LocalMqtt);
+        //messageBridge.removeMessageClient(TopicMapping.TopicType.LocalMqtt);
         if (mqttClient != null) {
             mqttClient.stop();
         }

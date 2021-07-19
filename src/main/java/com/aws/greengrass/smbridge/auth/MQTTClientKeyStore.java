@@ -41,8 +41,8 @@ import javax.net.ssl.TrustManagerFactory;
 public class MQTTClientKeyStore {
     private static final Logger LOGGER = LogManager.getLogger(MQTTClientKeyStore.class);
     static final char[] DEFAULT_KEYSTORE_PASSWORD = "".toCharArray();
-    private static final String DEFAULT_CN = "aws-greengrass-mqttbridge";
-    static final String KEY_ALIAS = "aws-greengrass-mqttbridge";
+    private static final String DEFAULT_CN = "aws-greengrass-smbridge";
+    static final String KEY_ALIAS = "aws-greengrass-smbridge";
     private static final String RSA_KEY_INSTANCE = "RSA";
     private static final int RSA_KEY_LENGTH = 2048;
 

@@ -7,8 +7,7 @@ package com.aws.greengrass.smbridge;
 
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.smbridge.clients.MessageClient;
-import com.aws.greengrass.smbridge.clients.MessageClientException;
+import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.util.Pair;
 
 import java.util.ArrayList;
@@ -28,13 +27,14 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     // A map from type of message client to the clients. For example, LocalMqtt -> MQTTClient
-    private final Map<TopicMapping.TopicType, MessageClient> messageClientMap = new ConcurrentHashMap<>();
+    //private final Map<TopicMapping.TopicType, MessageClient> messageClientMap = new ConcurrentHashMap<>();
     // A map from type of source to its mapping. The mapping is actually mapping from topic name to its destinations
     // (destination topic + type). This data structure may change once we introduce complex routing mechanism.
     // Example:
     // LocalMqtt -> {"/sourceTopic", [{"/destinationTopic", IoTCore}, {"/destinationTopic2", Pubsub}]}
-    private Map<TopicMapping.TopicType, Map<String, List<Pair<String, TopicMapping.TopicType>>>>
+    /*private Map<TopicMapping.TopicType, Map<String, List<Pair<String, TopicMapping.TopicType>>>>
             perClientSourceDestinationMap = new HashMap<>();
+    */
 
     /**
      * Ctr for Message Bridge.
@@ -54,25 +54,27 @@ public class MessageBridge {
      *                      MQTTClient
      * @param messageClient client
      */
-    public void addOrReplaceMessageClient(TopicMapping.TopicType clientType, MessageClient messageClient) {
+    /* public void addOrReplaceMessageClient(TopicMapping.TopicType clientType, MessageClient messageClient) {
         messageClientMap.put(clientType, messageClient);
         updateSubscriptionsForClient(clientType, messageClient);
     }
+    */
 
     /**
      * Remove the client of given type.
      *
      * @param clientType client type
      */
+    /*
     public void removeMessageClient(TopicMapping.TopicType clientType) {
         messageClientMap.remove(clientType);
-    }
+    }*/
 
     private void handleMessage(TopicMapping.TopicType sourceType, Message message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceType", sourceType).kv("sourceTopic", sourceTopic).log("Message received");
 
-        Map<String, List<Pair<String, TopicMapping.TopicType>>> srcDestMapping =
+        /*Map<String, List<Pair<String, TopicMapping.TopicType>>> srcDestMapping =
                 perClientSourceDestinationMap.get(sourceType);
 
         LOGGER.atDebug().kv("destinations", srcDestMapping).log("Message will be forwarded to destinations");
@@ -98,7 +100,7 @@ public class MessageBridge {
                     }
                 }
             }
-        }
+        }*/
     }
 
     private void processMappingAndSubscribe() {
@@ -121,11 +123,11 @@ public class MessageBridge {
 
         perClientSourceDestinationMap = perClientSourceDestinationMapTemp;
 
-        messageClientMap.forEach(this::updateSubscriptionsForClient);
+        //messageClientMap.forEach(this::updateSubscriptionsForClient);
         LOGGER.atDebug().kv("topicMapping", perClientSourceDestinationMap).log("Processed mapping");
     }
 
-    private synchronized void updateSubscriptionsForClient(TopicMapping.TopicType clientType,
+    /*private synchronized void updateSubscriptionsForClient(TopicMapping.TopicType clientType,
                                                            MessageClient messageClient) {
         Map<String, List<Pair<String, TopicMapping.TopicType>>> srcDestMapping =
                 perClientSourceDestinationMap.get(clientType);
@@ -140,5 +142,5 @@ public class MessageBridge {
         LOGGER.atDebug().kv("clientType", clientType).kv("topics", topicsToSubscribe).log("Updating subscriptions");
 
         messageClient.updateSubscriptions(topicsToSubscribe, message -> handleMessage(clientType, message));
-    }
+    }*/
 }

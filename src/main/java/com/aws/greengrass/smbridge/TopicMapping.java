@@ -30,13 +30,6 @@ public class TopicMapping {
     private List<UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
 
     /**
-     * Type of the topic.
-     */
-    public enum TopicType {
-        IotCore, Pubsub, LocalMqtt
-    }
-
-    /**
      * A single entry in the mapping.
      */
     @AllArgsConstructor
@@ -44,17 +37,17 @@ public class TopicMapping {
     @EqualsAndHashCode
     public static class MappingEntry {
         @Getter
-        @JsonProperty("SourceTopic")
-        private String sourceTopic;
+        @JsonProperty("topic")
+        private String topic;
         @Getter
-        @JsonProperty("SourceTopicType")
-        private TopicType sourceTopicType;
+        @JsonProperty("stream")
+        private String stream;
         @Getter
-        @JsonProperty("DestTopic")
-        private String destTopic;
+        @JsonProperty("appendTopic")
+        private boolean appendTopic = false;
         @Getter
-        @JsonProperty("DestTopicType")
-        private TopicType destTopicType;
+        @JsonProperty("appendTime")
+        private boolean appendTime = false;
     }
 
     @FunctionalInterface
@@ -71,7 +64,7 @@ public class TopicMapping {
     public void updateMapping(@NonNull String mappingAsJson) throws IOException {
         final TypeReference<ArrayList<MappingEntry>> typeRef = new TypeReference<ArrayList<MappingEntry>>() {
         };
-        mapping = SerializerFactory.getJsonObjectMapper().readValue(mappingAsJson, typeRef);
+        mapping = SerializerFactory.getFailSafeJsonObjectMapper().readValue(mappingAsJson, typeRef);
         // TODO: Check for duplicates, General validation + unit tests. Topic strings need to be validated (allowed
         //  filter?, etc)
         updateListeners.forEach(UpdateListener::onUpdate);

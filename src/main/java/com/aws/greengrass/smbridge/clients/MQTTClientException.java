@@ -6,16 +6,27 @@
 package com.aws.greengrass.smbridge.clients;
 
 /**
- * Exception thrown by the MQTT Client.
+ * Exception thrown by the Message Clients.
  */
-public class MQTTClientException extends MessageClientException {
+public class MQTTClientException extends Exception {
     static final long serialVersionUID = -3387516993124229948L;
 
-    MQTTClientException(String msg, Throwable cause) {
+    /**
+     * Ctr for {@link MQTTClientException}.
+     *
+     * @param msg   message
+     * @param cause cause of the exception
+     */
+    public MQTTClientException(String msg, Throwable cause) {
         super(msg, cause);
     }
 
-    MQTTClientException(String msg) {
+    /**
+     * Ctr for {@link MQTTClientException}.
+     *
+     * @param msg message
+     */
+    public MQTTClientException(String msg) {
         super(msg);
     }
 }

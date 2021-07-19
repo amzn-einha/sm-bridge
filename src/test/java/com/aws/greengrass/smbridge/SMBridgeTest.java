@@ -58,6 +58,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, GGExtension.class})
 public class SMBridgeTest extends GGServiceTestUtil {
+    /*
     private static final long TEST_TIME_OUT_SEC = 30L;
 
     private Kernel kernel;
@@ -231,5 +232,5 @@ public class SMBridgeTest extends GGServiceTestUtil {
         SMBridge.startup();
         SMBridge.shutdown();
         verify(mockMqttClientKeyStore, never()).updateCA(caListCaptor.capture());
-    }
+    }*/
 }
