@@ -8,7 +8,7 @@ package com.aws.greengrass.smbridge.clients;
 /**
  * Exception thrown by the MQTT Client.
  */
-public class MQTTClientException extends MessageClientException {
+public class MQTTClientException extends Exception {
     static final long serialVersionUID = -3387516993124229948L;
 
     MQTTClientException(String msg, Throwable cause) {

@@ -5,8 +5,6 @@
 
 package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.smbridge.clients.MessageClient;
-import com.aws.greengrass.smbridge.clients.MessageClientException;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
