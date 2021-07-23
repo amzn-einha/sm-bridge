@@ -25,7 +25,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -41,8 +40,8 @@ import javax.net.ssl.TrustManagerFactory;
 public class MQTTClientKeyStore {
     private static final Logger LOGGER = LogManager.getLogger(MQTTClientKeyStore.class);
     static final char[] DEFAULT_KEYSTORE_PASSWORD = "".toCharArray();
-    private static final String DEFAULT_CN = "aws-greengrass-mqttbridge";
-    static final String KEY_ALIAS = "aws-greengrass-mqttbridge";
+    private static final String DEFAULT_CN = "aws-greengrass-smbridge";
+    static final String KEY_ALIAS = "aws-greengrass-smbridge";
     private static final String RSA_KEY_INSTANCE = "RSA";
     private static final int RSA_KEY_LENGTH = 2048;
 
@@ -88,7 +87,7 @@ public class MQTTClientKeyStore {
         try {
             keyStore.load(null, DEFAULT_KEYSTORE_PASSWORD);
         } catch (IOException | NoSuchAlgorithmException | CertificateException e) {
-            throw new KeyStoreException("unable to load keystore", e);
+            throw new KeyStoreException("Unable to load keystore", e);
         }
 
         String csr;
@@ -96,7 +95,7 @@ public class MQTTClientKeyStore {
             //client cert doesn't require SANs
             csr = CertificateRequestGenerator.createCSR(keyPair, DEFAULT_CN, null,  null);
         } catch (IOException | OperatorCreationException e) {
-            throw new CsrGeneratingException("unable to generate CSR from keypair", e);
+            throw new CsrGeneratingException("Unable to generate CSR from keypair", e);
         }
         certificateManager.subscribeToClientCertificateUpdates(csr, this::updateCert);
     }
@@ -107,9 +106,8 @@ public class MQTTClientKeyStore {
         return kpg.generateKeyPair();
     }
 
-    private void updateCert(X509Certificate cert) {
+    private void updateCert(X509Certificate... certChain) {
         try {
-            Certificate[] certChain = {cert};
             keyStore.setKeyEntry(KEY_ALIAS, keyPair.getPrivate(), DEFAULT_KEYSTORE_PASSWORD, certChain);
 
             updateListeners.forEach(UpdateListener::onUpdate); //notify MQTTClient
@@ -180,7 +178,7 @@ public class MQTTClientKeyStore {
             sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
             return sc.getSocketFactory();
         } catch (NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException | KeyManagementException e) {
-            throw new KeyStoreException("unable to create SocketFactory from KeyStore", e);
+            throw new KeyStoreException("Unable to create SocketFactory from KeyStore", e);
         }
     }
 }
