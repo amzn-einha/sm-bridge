@@ -13,7 +13,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public class Message {
-    private String topic;
+public class StreamMessage {
+    private String stream;
     private byte[] payload;
 }

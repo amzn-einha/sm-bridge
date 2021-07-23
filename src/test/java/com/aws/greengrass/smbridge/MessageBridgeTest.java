@@ -49,7 +49,7 @@ public class MessageBridgeTest {
     }
 
     @Test
-    void GIVEN_mqtt_bridge_and_mapping_populated_WHEN_add_client_THEN_subscribed() throws Exception {
+    void GIVEN_sm_bridge_and_mapping_populated_WHEN_add_client_THEN_subscribed() throws Exception {
         TopicMapping mapping = new TopicMapping();
         Map<String, TopicMapping.MappingEntry> mappingToUpdate = Utils.immutableMap("m1",
                 new TopicMapping.MappingEntry("mqtt/topic", TopicMapping.TopicType.LocalMqtt,
@@ -263,16 +263,19 @@ public class MessageBridgeTest {
 
         byte[] messageOnTopic1 = "message from topic mqtt/topic".getBytes();
         byte[] messageOnTopic2 = "message from topic mqtt/topic2".getBytes();
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic", messageOnTopic1));
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic2", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic", messageOnTopic1));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic2", messageOnTopic2));
 
         // Also send on an unknown topic
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/unknown", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/unknown", messageOnTopic2));
 
         verify(mockMessageClient, times(0)).publish(any());
         ArgumentCaptor<Message> messagePubSubCaptor = ArgumentCaptor.forClass(Message.class);
         verify(mockMessageClient2, times(2)).publish(messagePubSubCaptor.capture());
         ArgumentCaptor<Message> messageIotCoreCaptor = ArgumentCaptor.forClass(Message.class);
+        ArgumentCaptor<Message> messagePubSubCaptor = ArgumentCaptor.forClass(MQTTMessage.class);
+        verify(mockMessageClient2, times(3)).publish(messagePubSubCaptor.capture());
+        ArgumentCaptor<Message> messageIotCoreCaptor = ArgumentCaptor.forClass(MQTTMessage.class);
         verify(mockMessageClient3, times(1)).publish(messageIotCoreCaptor.capture());
 
         MatcherAssert.assertThat(messageIotCoreCaptor.getAllValues().get(0).getTopic(),
