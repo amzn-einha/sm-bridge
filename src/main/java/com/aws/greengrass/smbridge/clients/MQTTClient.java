@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.net.ssl.SSLSocketFactory;
 
-public class MQTTClient implements MessageClient {
+public class MQTTClient {
     private static final Logger LOGGER = LogManager.getLogger(MQTTClient.class);
     private static final String DEFAULT_BROKER_URI = "ssl://localhost:8883";
     public static final String BROKER_URI_KEY = "brokerServerUri";
@@ -98,9 +98,9 @@ public class MQTTClient implements MessageClient {
         this.mqttClientInternal = mqttClient;
         this.dataStore = new MemoryPersistence();
         this.serverUri = Coerce.toString(topics.findOrDefault(DEFAULT_BROKER_URI,
-                KernelConfigResolver.PARAMETERS_CONFIG_KEY, BROKER_URI_KEY));
+                KernelConfigResolver.CONFIGURATION_CONFIG_KEY, BROKER_URI_KEY));
         this.clientId = Coerce.toString(topics.findOrDefault(SMBridge.SERVICE_NAME,
-                KernelConfigResolver.PARAMETERS_CONFIG_KEY, CLIENT_ID_KEY));
+                KernelConfigResolver.CONFIGURATION_CONFIG_KEY, CLIENT_ID_KEY));
         this.mqttClientKeyStore = mqttClientKeyStore;
         this.mqttClientKeyStore.listenToUpdates(this::reset);
     }
@@ -188,7 +188,6 @@ public class MQTTClient implements MessageClient {
         });
     }
 
-    @Override
     public synchronized void updateSubscriptions(Set<String> topics, Consumer<Message> messageHandler) {
         updateSubscriptionsInternal(topics, messageHandler);
     }

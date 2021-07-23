@@ -5,7 +5,6 @@
 
 package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.builtin.services.pubsub.PubSubIPCAgent;
 import com.aws.greengrass.certificatemanager.DCMService;
 import com.aws.greengrass.certificatemanager.certificate.CsrProcessingException;
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
@@ -17,10 +16,8 @@ import com.aws.greengrass.lifecyclemanager.PluginService;
 import com.aws.greengrass.lifecyclemanager.exceptions.ServiceLoadException;
 import com.aws.greengrass.smbridge.auth.CsrGeneratingException;
 import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
-import com.aws.greengrass.smbridge.clients.IoTCoreClient;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.MQTTClientException;
-import com.aws.greengrass.smbridge.clients.PubSubClient;
 import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.util.Coerce;
 import com.aws.greengrass.util.Utils;
@@ -35,7 +32,7 @@ import javax.inject.Inject;
 
 @ImplementsService(name = SMBridge.SERVICE_NAME)
 public class SMBridge extends PluginService {
-    public static final String SERVICE_NAME = "aws.greengrass.MqttBridge";
+    public static final String SERVICE_NAME = "aws.greengrass.SmBridge";
 
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
     private final TopicMapping topicMapping;
@@ -43,42 +40,36 @@ public class SMBridge extends PluginService {
     private final Kernel kernel;
     private final MQTTClientKeyStore mqttClientKeyStore;
     private MQTTClient mqttClient;
-    private PubSubClient pubSubClient;
-    private IoTCoreClient ioTCoreClient;
-    static final String MQTT_TOPIC_MAPPING = "mqttTopicMapping";
+    static final String MQTT_STREAM_MAPPING = "mqttStreamMapping";
 
     /**
      * Ctr for MQTTBridge.
      *
      * @param topics             topics passed by by the Nucleus
      * @param topicMapping       mapping of mqtt topics to iotCore/pubsub topics
-     * @param pubSubIPCAgent     IPC agent for pubsub
-     * @param iotMqttClient      mqtt client for iot core
      * @param kernel             greengrass kernel
      * @param mqttClientKeyStore KeyStore for MQTT Client
      */
     @Inject
-    public SMBridge(Topics topics, TopicMapping topicMapping, PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient,
+    public SMBridge(Topics topics, TopicMapping topicMapping,
                     Kernel kernel, MQTTClientKeyStore mqttClientKeyStore) {
-        this(topics, topicMapping, new MessageBridge(topicMapping), pubSubIPCAgent, iotMqttClient, kernel,
+        this(topics, topicMapping, new MessageBridge(topicMapping), kernel,
              mqttClientKeyStore);
     }
 
     protected SMBridge(Topics topics, TopicMapping topicMapping, MessageBridge messageBridge,
-                       PubSubIPCAgent pubSubIPCAgent, MqttClient iotMqttClient, Kernel kernel,
+                       Kernel kernel,
                        MQTTClientKeyStore mqttClientKeyStore) {
         super(topics);
         this.topicMapping = topicMapping;
         this.kernel = kernel;
         this.mqttClientKeyStore = mqttClientKeyStore;
         this.messageBridge = messageBridge;
-        this.pubSubClient = new PubSubClient(pubSubIPCAgent);
-        this.ioTCoreClient = new IoTCoreClient(iotMqttClient);
     }
 
     @Override
     public void install() {
-        this.config.lookup(KernelConfigResolver.PARAMETERS_CONFIG_KEY, MQTT_TOPIC_MAPPING).dflt("[]")
+        this.config.lookup(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, MQTT_STREAM_MAPPING).dflt("[]")
                 .subscribe((why, newv) -> {
                     try {
                         String mapping = Coerce.toString(newv);
@@ -131,35 +122,18 @@ public class SMBridge extends PluginService {
         try {
             mqttClient = new MQTTClient(this.config, mqttClientKeyStore);
             mqttClient.start();
-            messageBridge.addOrReplaceMessageClient(TopicMapping.TopicType.LocalMqtt, mqttClient);
+            messageBridge.addOrReplaceMqttClient(mqttClient);
         } catch (MQTTClientException e) {
             serviceErrored(e);
             return;
         }
-        pubSubClient.start();
-        messageBridge.addOrReplaceMessageClient(TopicMapping.TopicType.Pubsub, pubSubClient);
-
-        ioTCoreClient.start();
-        messageBridge.addOrReplaceMessageClient(TopicMapping.TopicType.IotCore, ioTCoreClient);
-
         reportState(State.RUNNING);
     }
 
     @Override
     public void shutdown() {
-        messageBridge.removeMessageClient(TopicMapping.TopicType.LocalMqtt);
         if (mqttClient != null) {
             mqttClient.stop();
-        }
-
-        messageBridge.removeMessageClient(TopicMapping.TopicType.Pubsub);
-        if (pubSubClient != null) {
-            pubSubClient.stop();
-        }
-
-        messageBridge.removeMessageClient(TopicMapping.TopicType.IotCore);
-        if (ioTCoreClient != null) {
-            ioTCoreClient.stop();
         }
     }
 }

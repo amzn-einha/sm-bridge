@@ -7,9 +7,7 @@ package com.aws.greengrass.smbridge;
 
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.smbridge.clients.MessageClient;
-import com.aws.greengrass.smbridge.clients.MessageClientException;
-import com.aws.greengrass.util.Pair;
+import com.aws.greengrass.smbridge.clients.MQTTClient;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,24 +15,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Bridges/Routes the messages flowing between clients to various brokers. This class process the topics mappings. It
+ * Bridges/Routes the messages flowing from local MQTT to SM. This class process the topics mappings. It
  * tells the clients to subscribe to the relevant topics and routes the messages to other clients when received.
  */
 public class MessageBridge {
     private static final Logger LOGGER = LogManager.getLogger(MessageBridge.class);
 
     private final TopicMapping topicMapping;
-    // A map from type of message client to the clients. For example, LocalMqtt -> MQTTClient
-    private final Map<TopicMapping.TopicType, MessageClient> messageClientMap = new ConcurrentHashMap<>();
-    // A map from type of source to its mapping. The mapping is actually mapping from topic name to its destinations
-    // (destination topic + type). This data structure may change once we introduce complex routing mechanism.
+    private MQTTClient mqttClient;
+
+    // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
+    // append-values.
     // Example:
-    // LocalMqtt -> {"/sourceTopic", [{"/destinationTopic", IoTCore}, {"/destinationTopic2", Pubsub}]}
-    private Map<TopicMapping.TopicType, Map<String, List<Pair<String, TopicMapping.TopicType>>>>
-            perClientSourceDestinationMap = new HashMap<>();
+    // "/sourceTopic1" -> [{"/sourceTopic1", "outputStream1", false, true}]
+    private Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMap = new HashMap<>();
 
     /**
      * Ctr for Message Bridge.
@@ -42,103 +38,74 @@ public class MessageBridge {
      * @param topicMapping topics mapping
      */
     public MessageBridge(TopicMapping topicMapping) {
+        this.mqttClient = null;
         this.topicMapping = topicMapping;
-        this.topicMapping.listenToUpdates(this::processMappingAndSubscribe);
-        processMappingAndSubscribe();
+        this.topicMapping.listenToUpdates(this::processMapping);
+        processMapping();
     }
 
-    /**
-     * Add or replace the client of given type.
-     *
-     * @param clientType    type of the client (type is the `source` type). Example, it will be LocalMqtt for
-     *                      MQTTClient
-     * @param messageClient client
-     */
-    public void addOrReplaceMessageClient(TopicMapping.TopicType clientType, MessageClient messageClient) {
-        messageClientMap.put(clientType, messageClient);
-        updateSubscriptionsForClient(clientType, messageClient);
-    }
-
-    /**
-     * Remove the client of given type.
-     *
-     * @param clientType client type
-     */
-    public void removeMessageClient(TopicMapping.TopicType clientType) {
-        messageClientMap.remove(clientType);
-    }
-
-    private void handleMessage(TopicMapping.TopicType sourceType, Message message) {
+    private void handleMessage(Message message) {
         String sourceTopic = message.getTopic();
-        LOGGER.atDebug().kv("sourceType", sourceType).kv("sourceTopic", sourceTopic).log("Message received");
+        LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
-        Map<String, List<Pair<String, TopicMapping.TopicType>>> srcDestMapping =
-                perClientSourceDestinationMap.get(sourceType);
+        LOGGER.atDebug().kv("destinations", sourceDestinationMap).log("Message will be forwarded to destinations");
 
-        LOGGER.atDebug().kv("destinations", srcDestMapping).log("Message will be forwarded to destinations");
-
-        if (srcDestMapping != null) {
-            List<Pair<String, TopicMapping.TopicType>> destinations = srcDestMapping.get(sourceTopic);
+        if (sourceDestinationMap != null) {
+            List<TopicMapping.MappingEntry> destinations = sourceDestinationMap.get(sourceTopic);
             if (destinations == null) {
                 return;
             }
-            for (Pair<String, TopicMapping.TopicType> destination : destinations) {
-                MessageClient client = messageClientMap.get(destination.getRight());
-                if (client != null) {
-                    Message msg = new Message(destination.getLeft(), message.getPayload());
+            LOGGER.atDebug().log("HANDLING MESSAGE, NO IMPLEMENTED SM CLIENT");
+            /*
+            for (TopicMapping.MappingEntry destination : destinations) {
+                if (smClient != null) { // TODO: Add SM Client in Message Bridge
+                    Message msg = new Message(sourceTopic, message.getPayload());
                     try {
-                        client.publish(msg);
-                        LOGGER.atDebug().kv("sourceType", sourceType).kv("sourceTopic", sourceTopic)
-                                .kv("destType", destination.getRight()).kv("destTopic", destination.getLeft())
+                        smClient.publish(msg);
+                        LOGGER.atDebug().kv("topic", sourceTopic).kv("stream", destination.getStream())
                                 .log("Published message");
                     } catch (MessageClientException e) {
-                        LOGGER.atError().kv("sourceType", sourceType).kv("sourceTopic", sourceTopic)
-                                .kv("destType", destination.getRight()).kv("destTopic", destination.getLeft())
+                        LOGGER.atError().kv("topic", sourceTopic).kv("stream", destination.getStream())
                                 .log("Failed to publish");
                     }
                 }
             }
+            */
         }
     }
 
-    private void processMappingAndSubscribe() {
+    private void processMapping() {
         List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
-        Map<TopicMapping.TopicType, Map<String, List<Pair<String, TopicMapping.TopicType>>>>
-                perClientSourceDestinationMapTemp = new HashMap<>();
+        Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
 
         mappingEntryList.forEach(mappingEntry -> {
-            // Ensure mapping for client type
-            Map<String, List<Pair<String, TopicMapping.TopicType>>> sourceDestinationMap =
-                    perClientSourceDestinationMapTemp
-                            .computeIfAbsent(mappingEntry.getSourceTopicType(), k -> new HashMap<>());
-
             // Add destinations for each source topic
-            sourceDestinationMap.computeIfAbsent(mappingEntry.getSourceTopic(), k -> new ArrayList<>())
-                    .add(new Pair<>(mappingEntry.getDestTopic(), mappingEntry.getDestTopicType()));
+            sourceDestinationMapTemp.computeIfAbsent(mappingEntry.getTopic(), k -> new ArrayList<>())
+                    .add(mappingEntry);
         });
 
-        perClientSourceDestinationMap = perClientSourceDestinationMapTemp;
+        sourceDestinationMap = sourceDestinationMapTemp;
 
-        messageClientMap.forEach(this::updateSubscriptionsForClient);
-        LOGGER.atDebug().kv("topicMapping", perClientSourceDestinationMap).log("Processed mapping");
+        LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 
-    private synchronized void updateSubscriptionsForClient(TopicMapping.TopicType clientType,
-                                                           MessageClient messageClient) {
-        Map<String, List<Pair<String, TopicMapping.TopicType>>> srcDestMapping =
-                perClientSourceDestinationMap.get(clientType);
+    public void addOrReplaceMqttClient(MQTTClient mqttClient){
+        this.mqttClient = mqttClient;
+        updateSubscriptionsForClient(mqttClient);
+    }
 
+    private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
         Set<String> topicsToSubscribe;
-        if (srcDestMapping == null) {
+        if (sourceDestinationMap == null) {
             topicsToSubscribe = new HashSet<>();
         } else {
-            topicsToSubscribe = srcDestMapping.keySet();
+            topicsToSubscribe = sourceDestinationMap.keySet();
         }
 
-        LOGGER.atDebug().kv("clientType", clientType).kv("topics", topicsToSubscribe).log("Updating subscriptions");
+        LOGGER.atDebug().kv("topics", topicsToSubscribe).log("Updating subscriptions");
 
-        messageClient.updateSubscriptions(topicsToSubscribe, message -> handleMessage(clientType, message));
+        mqttClient.updateSubscriptions(topicsToSubscribe, message -> handleMessage(message));
     }
 }
