@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge.auth;
+package com.aws.greengrass.smbridge.auth;
 
 import com.aws.greengrass.certificatemanager.CertificateManager;
 import com.aws.greengrass.certificatemanager.certificate.CertificateRequestGenerator;

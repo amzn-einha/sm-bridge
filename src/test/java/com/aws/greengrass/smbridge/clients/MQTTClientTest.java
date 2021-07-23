@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.aws.greengrass.mqttbridge.clients;
+package com.aws.greengrass.smbridge.clients;
 
 import com.aws.greengrass.certificatemanager.CertificateManager;
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.config.Topics;
-import com.aws.greengrass.mqttbridge.Message;
-import com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStore;
+import com.aws.greengrass.smbridge.Message;
+import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
@@ -31,7 +31,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import javax.net.ssl.SSLSocketFactory;
 
-import static com.aws.greengrass.mqttbridge.auth.MQTTClientKeyStoreTest.CERTIFICATE;
+import static com.aws.greengrass.smbridge.auth.MQTTClientKeyStoreTest.CERTIFICATE;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
