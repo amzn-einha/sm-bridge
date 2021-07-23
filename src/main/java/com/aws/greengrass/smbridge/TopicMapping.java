@@ -15,8 +15,8 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.lang.reflect.Array;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -25,7 +25,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @NoArgsConstructor
 public class TopicMapping {
     @Getter
-    private List<MappingEntry> mapping = new ArrayList<>();
+    private Map<String, MappingEntry> mapping = new HashMap<>();
+
+    public ArrayList<MappingEntry> getList(){
+        return new ArrayList<>(mapping.values());
+    }
 
     private List<UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
 
@@ -56,17 +60,14 @@ public class TopicMapping {
     }
 
     /**
-     * Update the topic mapping by parsing the mapping given as json.
+     * Update the topic mapping to the passed argument
      *
-     * @param mappingAsJson mapping as a json string
-     * @throws IOException if unable to parse the string
+     * @param mapping       mapping as a list
      */
-    public void updateMapping(@NonNull String mappingAsJson) throws IOException {
-        final TypeReference<ArrayList<MappingEntry>> typeRef = new TypeReference<ArrayList<MappingEntry>>() {
-        };
-        mapping = SerializerFactory.getFailSafeJsonObjectMapper().readValue(mappingAsJson, typeRef);
+    public void updateMapping(@NonNull Map<String, MappingEntry> mapping) {
         // TODO: Check for duplicates, General validation + unit tests. Topic strings need to be validated (allowed
         //  filter?, etc)
+        this.mapping = mapping;
         updateListeners.forEach(UpdateListener::onUpdate);
     }
 

@@ -6,21 +6,21 @@
 package com.aws.greengrass.smbridge;
 
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
+import com.aws.greengrass.util.Utils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith({MockitoExtension.class, GGExtension.class})
 public class TopicMappingTest {
@@ -30,43 +30,20 @@ public class TopicMappingTest {
         TopicMapping mapping = new TopicMapping();
         CountDownLatch updateLatch = new CountDownLatch(1);
         mapping.listenToUpdates(updateLatch::countDown);
-        mapping.updateMapping("[\n"
-                + "  {\"SourceTopic\": \"mqtt/topic\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic\", \"DestTopicType\": \"IotCore\"},\n"
-                + "  {\"SourceTopic\": \"mqtt/topic2\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/pubsub/topic\", \"DestTopicType\": \"Pubsub\"},\n"
-                + "  {\"SourceTopic\": \"mqtt/topic3\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic2\", \"DestTopicType\": \"IotCore\"}\n"
-                + "]");
+        Map<String, TopicMapping.MappingEntry> mappingToUpdate = Utils.immutableMap(
+                "m1", new TopicMapping.MappingEntry("mqtt/topic", "RandomStream", true, false),
+                "m2", new TopicMapping.MappingEntry("mqtt/topic2", "RandomStream2", false, true),
+                "m3", new TopicMapping.MappingEntry("mqtt/topic3", "RandomStream2", false, false));
+        mapping.updateMapping(mappingToUpdate);
 
         Assertions.assertTrue(updateLatch.await(100, TimeUnit.MILLISECONDS));
 
-        List<TopicMapping.MappingEntry> expectedMapping = new ArrayList<>();
-        expectedMapping.add(new TopicMapping.MappingEntry("mqtt/topic", TopicMapping.TopicType.LocalMqtt,
-                "/test/cloud" + "/topic", TopicMapping.TopicType.IotCore));
-        expectedMapping.add(new TopicMapping.MappingEntry("mqtt/topic2", TopicMapping.TopicType.LocalMqtt,
-                "/test/pubsub/topic", TopicMapping.TopicType.Pubsub));
-        expectedMapping.add(new TopicMapping.MappingEntry("mqtt/topic3", TopicMapping.TopicType.LocalMqtt,
-                "/test/cloud/topic2", TopicMapping.TopicType.IotCore));
+        Map<String, TopicMapping.MappingEntry> expectedMapping = new HashMap<>();
+        expectedMapping.put("m1", new TopicMapping.MappingEntry("mqtt/topic", "RandomStream", true, false));
+        expectedMapping.put("m2", new TopicMapping.MappingEntry("mqtt/topic2", "RandomStream2", false, true));
+        expectedMapping.put("m3", new TopicMapping.MappingEntry("mqtt/topic3", "RandomStream2", false, false));
 
-        assertArrayEquals(expectedMapping.toArray(), mapping.getMapping().toArray());
-    }
-
-    @Test
-    void GIVEN_invalid_mapping_as_json_string_WHEN_updateMapping_THEN_mapping_not_updated() throws Exception {
-        TopicMapping mapping = new TopicMapping();
-        CountDownLatch updateLatch = new CountDownLatch(1);
-        mapping.listenToUpdates(updateLatch::countDown);
-
-        assertThat(mapping.getMapping().size(), is(equalTo(0)));
-        // Updating with invalid mapping (Providing type as Pubsub-Invalid)
-        Assertions.assertThrows(IOException.class, () -> mapping.updateMapping("[\n"
-                + "  {\"SourceTopic\": \"mqtt/topic\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic\", \"DestTopicType\": \"IotCore\"},\n"
-                + "  {\"SourceTopic\": \"mqtt/topic2\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": "
-                + "\"/test/pubsub/topic\", \"DestTopicType\": \"Pubsub-Invalid\"},\n"
-                + "  {\"SourceTopic\": \"mqtt/topic3\", \"SourceTopicType\": \"LocalMqtt\", \"DestTopic\": \"/test/cloud/topic2\", \"DestTopicType\": \"IotCore\"}\n"
-                + "]"));
-
-        Assertions.assertFalse(updateLatch.await(100, TimeUnit.MILLISECONDS));
-
-        assertThat(mapping.getMapping().size(), is(equalTo(0)));
+        assertEquals(mapping.getMapping(), expectedMapping);
     }
 
     @Test
