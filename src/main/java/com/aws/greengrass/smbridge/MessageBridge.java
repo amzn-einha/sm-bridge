@@ -9,7 +9,7 @@ import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
-import org.apache.http.cookie.SM;
+import com.aws.greengrass.smbridge.clients.SMClientException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,8 +41,6 @@ public class MessageBridge {
      * @param topicMapping topics mapping
      */
     public MessageBridge(TopicMapping topicMapping) {
-        this.mqttClient = null;
-        this.smClient = null;
         this.topicMapping = topicMapping;
         this.topicMapping.listenToUpdates(this::processMapping);
         processMapping();
@@ -69,13 +67,23 @@ public class MessageBridge {
             // TODO: Append relevant metadata
             // TODO sev5: add exception handling here like MQTT Bridge
             if (destinations == null) {
-                smClient.publishOnDefaultStream(message.getPayload());
+                try{
+                    smClient.publishOnDefaultStream(message.getPayload());
+                } catch (SMClientException e) {
+                    LOGGER.atError().setCause(e).kv("Stream", "Default Stream").log("Stream Publish failed");
+                }
                 return;
             }
             for (TopicMapping.MappingEntry entry : destinations){
                 String stream = entry.getStream();
                 StreamMessage streamMessage = new StreamMessage(stream, message.getPayload());
-                smClient.publish(streamMessage);
+                try {
+                    smClient.publish(streamMessage);
+                    LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
+                            .log("Published message");
+                } catch (SMClientException e) {
+                    LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
+                }
             }
         }
     }
@@ -94,6 +102,9 @@ public class MessageBridge {
 
         sourceDestinationMap = sourceDestinationMapTemp;
 
+        if (mqttClient != null) {
+            updateSubscriptionsForClient(mqttClient);
+        }
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 
