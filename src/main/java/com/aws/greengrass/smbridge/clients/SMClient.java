@@ -63,13 +63,13 @@ public class SMClient {
         }
     }
 
-    public void publishOnDefaultStream(byte[] payload) {
+    public void publishOnDefaultStream(byte[] payload) throws SMClientException{
         // TODO: Configurable default stream name
         String defaultStreamName = "mqttToStreamDefaultStreamName";
         publish(new StreamMessage(defaultStreamName, payload));
     }
 
-    public void publish(StreamMessage message) {
+    public void publish(StreamMessage message) throws SMClientException{
         try {
             if (!checkStreamExists(message.getStream())) {
                 // TODO: Configurable default stream

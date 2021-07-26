@@ -11,11 +11,11 @@ package com.aws.greengrass.smbridge.clients;
 public class SMClientException extends Exception {
     static final long serialVersionUID = -3387516993124229948L;
 
-    SMClientException(String msg, Throwable cause) {
+    public SMClientException(String msg, Throwable cause) {
         super(msg, cause);
     }
 
-    SMClientException(String msg) {
+    public SMClientException(String msg) {
         super(msg);
     }
 }

@@ -5,18 +5,17 @@
 
 package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.util.SerializerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
-import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -62,7 +61,7 @@ public class TopicMapping {
     /**
      * Update the topic mapping to the passed argument
      *
-     * @param mapping       mapping as a list
+     * @param mapping       mapping to update
      */
     public void updateMapping(@NonNull Map<String, MappingEntry> mapping) {
         // TODO: Check for duplicates, General validation + unit tests. Topic strings need to be validated (allowed
