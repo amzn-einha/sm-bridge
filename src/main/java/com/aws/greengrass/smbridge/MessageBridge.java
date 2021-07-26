@@ -8,8 +8,6 @@ package com.aws.greengrass.smbridge;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
-import com.aws.greengrass.smbridge.clients.SMClient;
-import org.apache.http.cookie.SM;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +25,6 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     private MQTTClient mqttClient;
-    private SMClient smClient;
 
     // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
     // append-values.
@@ -42,22 +39,12 @@ public class MessageBridge {
      */
     public MessageBridge(TopicMapping topicMapping) {
         this.mqttClient = null;
-        this.smClient = null;
         this.topicMapping = topicMapping;
         this.topicMapping.listenToUpdates(this::processMapping);
         processMapping();
     }
 
-    public void addOrReplaceMqttClient(MQTTClient mqttClient){
-        this.mqttClient = mqttClient;
-        updateSubscriptionsForClient(mqttClient);
-    }
-
-    public void addOrReplaceSMClient(SMClient smClient){
-        this.smClient = smClient;
-    }
-
-    private void handleMessage(MQTTMessage message) {
+    private void handleMessage(Message message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
@@ -65,23 +52,30 @@ public class MessageBridge {
 
         if (sourceDestinationMap != null) {
             List<TopicMapping.MappingEntry> destinations = sourceDestinationMap.get(sourceTopic);
-
-            // TODO: Append relevant metadata
-            // TODO sev5: add exception handling here like MQTT Bridge
             if (destinations == null) {
-                smClient.publishOnDefaultStream(message.getPayload());
                 return;
             }
-            for (TopicMapping.MappingEntry entry : destinations){
-                String stream = entry.getStream();
-                StreamMessage streamMessage = new StreamMessage(stream, message.getPayload());
-                smClient.publish(streamMessage);
+            LOGGER.atDebug().log("HANDLING MESSAGE, NO IMPLEMENTED SM CLIENT");
+            /*
+            for (TopicMapping.MappingEntry destination : destinations) {
+                if (smClient != null) { // TODO: Add SM Client in Message Bridge
+                    Message msg = new Message(sourceTopic, message.getPayload());
+                    try {
+                        smClient.publish(msg);
+                        LOGGER.atDebug().kv("topic", sourceTopic).kv("stream", destination.getStream())
+                                .log("Published message");
+                    } catch (MessageClientException e) {
+                        LOGGER.atError().kv("topic", sourceTopic).kv("stream", destination.getStream())
+                                .log("Failed to publish");
+                    }
+                }
             }
+            */
         }
     }
 
     private void processMapping() {
-        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getList();
+        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
         Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
@@ -95,6 +89,11 @@ public class MessageBridge {
         sourceDestinationMap = sourceDestinationMapTemp;
 
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
+    }
+
+    public void addOrReplaceMqttClient(MQTTClient mqttClient){
+        this.mqttClient = mqttClient;
+        updateSubscriptionsForClient(mqttClient);
     }
 
     private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
