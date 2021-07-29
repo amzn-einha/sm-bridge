@@ -41,7 +41,7 @@ import javax.inject.Inject;
 
 @ImplementsService(name = SMBridge.SERVICE_NAME)
 public class SMBridge extends PluginService {
-    public static final String SERVICE_NAME = "aws.greengrass.clientDevices.smBridge";
+    public static final String SERVICE_NAME = "aws.greengrass.clientDevices.sm.bridge";
 
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
     private final TopicMapping topicMapping;

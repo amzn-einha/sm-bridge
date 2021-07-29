@@ -10,13 +10,19 @@ import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
+import org.eclipse.paho.client.mqttv3.MqttTopic;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Bridges/Routes the messages flowing from local MQTT to SM. This class process the topics mappings. It
@@ -62,29 +68,62 @@ public class MessageBridge {
         LOGGER.atDebug().kv("destinations", sourceDestinationMap).log("Message will be forwarded to destinations");
 
         if (sourceDestinationMap != null) {
-            List<TopicMapping.MappingEntry> destinations = sourceDestinationMap.get(sourceTopic);
+            final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
+                List<TopicMapping.MappingEntry> destinations = sourceDestinationMap.get(sourceTopic);
 
-            // TODO: Append relevant metadata
-            // TODO sev5: add exception handling here like MQTT Bridge
-            if (destinations == null) {
-                try{
-                    smClient.publishOnDefaultStream(message.getPayload());
-                } catch (SMClientException e) {
-                    LOGGER.atError().setCause(e).kv("Stream", "Default Stream").log("Stream Publish failed");
+                if (destinations == null) {
+                    try {
+                        smClient.publishOnDefaultStream(message.getPayload());
+                    } catch (SMClientException e) {
+                        LOGGER.atError().setCause(e).kv("Stream", "Default Stream").log("Stream Publish failed");
+                    }
+                    return;
                 }
-                return;
-            }
-            for (TopicMapping.MappingEntry entry : destinations){
-                String stream = entry.getStream();
-                StreamMessage streamMessage = new StreamMessage(stream, message.getPayload());
-                try {
-                    smClient.publish(streamMessage);
-                    LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
-                            .log("Published message");
-                } catch (SMClientException e) {
-                    LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
+                for (TopicMapping.MappingEntry entry : destinations) {
+                    String stream = entry.getStream();
+                    StreamMessage streamMessage;
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
+
+                    if (entry.isAppendTime()){
+                        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
+                        LocalDateTime now = LocalDateTime.now();
+                        String stringTime = dtf.format(now) + ": ";
+                        byte[] time = stringTime.getBytes();
+                        try {
+                            byteArrayOutputStream.write(time);
+                        } catch (IOException e) {
+                            LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
+                        }
+                    }
+                    if (entry.isAppendTopic()){
+                        String stringTopic = message.getTopic() + ": ";
+                        byte[] topic = stringTopic.getBytes();
+                        try {
+                            byteArrayOutputStream.write(topic);
+                        } catch (IOException e) {
+                            LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
+                        }
+                    }
+                    try {
+                        byteArrayOutputStream.write(message.getPayload());
+                    } catch (IOException e) {
+                        LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
+                    }
+                    streamMessage = new StreamMessage(stream, byteArrayOutputStream.toByteArray());
+                    try {
+                        smClient.publish(streamMessage);
+                        LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
+                                .log("Published message");
+                    } catch (SMClientException e) {
+                        LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
+                    }
                 }
-            }
+            };
+            // Perform topic matching on filter
+            sourceDestinationMap.entrySet().stream().filter(
+                    mapping -> MqttTopic.isMatched(mapping.getKey(), sourceTopic))
+                    .map(Map.Entry::getValue)
+                    .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
         }
     }
 

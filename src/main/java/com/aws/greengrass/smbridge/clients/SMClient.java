@@ -55,6 +55,7 @@ public class SMClient {
     // TODO: Connect to stream manager on custom port
     //  https://docs.aws.amazon.com/greengrass/v2/developerguide/use-stream-manager-in-custom-components.html
     public void start() throws SMClientException {
+        LOGGER.atTrace("SMClient.start()");
         try {
             updateOrCreateStream(defaultStream);
         } catch (StreamManagerException e) {

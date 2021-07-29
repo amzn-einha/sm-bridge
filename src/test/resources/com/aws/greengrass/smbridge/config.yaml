@@ -1,7 +1,8 @@
 services:
-    aws.greengrass.MqttBridge:
-        parameters:
+    aws.greengrass.clientDevices.sm.bridge:
+        configuration:
             brokerServerUri: 'tcp://localhost:8883'
     main:
         dependencies:
-            - aws.greengrass.MqttBridge
+            - aws.greengrass.clientDevices.sm.bridge
+            - aws.greengrass.StreamManager

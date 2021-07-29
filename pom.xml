@@ -9,8 +9,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.aws.greengrass</groupId>
-    <artifactId>mqtt-bridge</artifactId>
-    <name>greengrass-mqtt-bridge</name>
+    <artifactId>sm-bridge</artifactId>
+    <name>greengrass-sm-bridge</name>
     <packaging>jar</packaging>
     <version>2.0.0-SNAPSHOT</version>
 
@@ -40,6 +40,12 @@
     </repositories>
 
     <dependencies>
+        <dependency>
+            <groupId>com.aws.greengrass</groupId>
+            <artifactId></artifactId>
+            <version>2.0.0-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.aws.greengrass</groupId>
             <artifactId>client-devices-auth</artifactId>
@@ -126,6 +132,13 @@
             <artifactId>hamcrest-eventually-matchers</artifactId>
             <version>0.0.3</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.amazonaws.greengrass</groupId>
+            <artifactId>streammanager</artifactId>
+            <version>1.1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/aws-greengrass-stream-manager-sdk-java-slim.jar</systemPath>
         </dependency>
     </dependencies>
     <build>
@@ -365,7 +378,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <skipTests>false</skipTests>
         <groups></groups>
-        <mqttbridgejar.name>aws.greengrass.clientdevices.mqtt.Bridge</mqttbridgejar.name>
+        <smbridgejar.name>aws.greengrass.clientdevices.sm.bridge</smbridgejar.name>
     </properties>
     <distributionManagement>
         <snapshotRepository>

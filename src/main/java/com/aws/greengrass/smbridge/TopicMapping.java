@@ -51,6 +51,14 @@ public class TopicMapping {
         @Getter
         @JsonProperty("appendTopic")
         private boolean appendTopic = false;
+
+        @Override
+        public String toString() {
+            return String.format(
+                    "{topic: %s, stream: %s, appendTime: %b, appendTopic: %b}",
+                    topic, stream, appendTime, appendTopic
+            );
+        }
     }
 
     @FunctionalInterface
