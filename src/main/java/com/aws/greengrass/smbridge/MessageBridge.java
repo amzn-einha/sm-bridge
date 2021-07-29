@@ -81,7 +81,7 @@ public class MessageBridge {
                     try {
                         byteArrayOutputStream.write(time);
                     } catch (IOException e) {
-                        LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
+                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
                     }
                 }
                 if (destination.isAppendTopic()){
@@ -90,13 +90,13 @@ public class MessageBridge {
                     try {
                         byteArrayOutputStream.write(topic);
                     } catch (IOException e) {
-                        LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
+                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
                     }
                 }
                 try {
                     byteArrayOutputStream.write(message.getPayload());
                 } catch (IOException e) {
-                    LOGGER.atWarn().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
+                    LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
                 }
                 streamMessage = new StreamMessage(stream, byteArrayOutputStream.toByteArray());
                 try {
