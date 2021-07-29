@@ -36,8 +36,8 @@ public class SMClient {
     @Inject
     public SMClient(Topics topics) throws SMClientException {
         this(topics, null);
-        // TODO: Handle the case when serverUri is modified
         try {
+            // TODO: Discover non-default SM port
             this.smClient = StreamManagerClientFactory.standard().build();
         } catch (StreamManagerException e) {
             throw new SMClientException("Unable to create a SM client", e);
