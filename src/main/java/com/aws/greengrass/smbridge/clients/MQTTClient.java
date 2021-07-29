@@ -16,7 +16,13 @@ import com.aws.greengrass.util.Coerce;
 import com.aws.greengrass.util.Utils;
 import lombok.AccessLevel;
 import lombok.Getter;
-import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.IMqttClient;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttClientPersistence;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import java.security.KeyStoreException;
