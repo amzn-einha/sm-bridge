@@ -98,7 +98,11 @@ public class MQTTClient {
         // TODO: Handle the case when serverUri is modified
         try {
             this.mqttClientInternal = new MqttClient(serverUri, clientId, dataStore);
+            LOGGER.atInfo().kv("Server URI", serverUri).kv("Client ID", clientId)
+                .log("Created new MQTT client");
         } catch (MqttException e) {
+            LOGGER.atError().setCause(e).kv("Server URI", serverUri).kv("Client ID", clientId)
+                .log("Failed to create new MQTT client");
             throw new MQTTClientException("Unable to create an MQTT client", e);
         }
     }
