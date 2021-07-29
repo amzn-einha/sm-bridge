@@ -101,7 +101,7 @@ public class SMClient {
         }
     }
 
-    private boolean checkStreamExists(String stream) throws StreamManagerException {
+    private boolean checkStreamExists(String stream) {
         try {
             MessageStreamInfo msi = smClient.describeMessageStream(stream);
             return true;
