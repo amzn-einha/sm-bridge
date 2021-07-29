@@ -133,6 +133,7 @@ public class MQTTClient {
         try {
             connectAndSubscribe();
         } catch (KeyStoreException e) {
+            LOGGER.atError().setCause(e).log("Failed to connect and subscribe to Broker");
             throw new RuntimeException(e);
         }
     }
@@ -147,6 +148,7 @@ public class MQTTClient {
         try {
             connectAndSubscribe();
         } catch (KeyStoreException e) {
+            LOGGER.atError().setCause(e).log("Failed to connect and subscribe to Broker");
             throw new RuntimeException(e);
         }
     }
