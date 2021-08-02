@@ -5,18 +5,17 @@
 
 package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.util.SerializerFactory;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -24,8 +23,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @NoArgsConstructor
 public class TopicMapping {
+    // Map from arbitrariy, unique mapping key to mapping entry. 
+    // Each entry contains MQTT->Stream configuration
     @Getter
-    private List<MappingEntry> mapping = new ArrayList<>();
+    private Map<String, MappingEntry> mapping = new HashMap<>();
+
+    public ArrayList<MappingEntry> getList(){
+        return new ArrayList<>(mapping.values());
+    }
 
     private List<UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
 
@@ -56,17 +61,14 @@ public class TopicMapping {
     }
 
     /**
-     * Update the topic mapping by parsing the mapping given as json.
+     * Update the topic mapping to the passed argument
      *
-     * @param mappingAsJson mapping as a json string
-     * @throws IOException if unable to parse the string
+     * @param mapping       mapping from entry key to mapping entry 
      */
-    public void updateMapping(@NonNull String mappingAsJson) throws IOException {
-        final TypeReference<ArrayList<MappingEntry>> typeRef = new TypeReference<ArrayList<MappingEntry>>() {
-        };
-        mapping = SerializerFactory.getFailSafeJsonObjectMapper().readValue(mappingAsJson, typeRef);
+    public void updateMapping(@NonNull Map<String, MappingEntry> mapping) {
         // TODO: Check for duplicates, General validation + unit tests. Topic strings need to be validated (allowed
         //  filter?, etc)
+        this.mapping = mapping;
         updateListeners.forEach(UpdateListener::onUpdate);
     }
 
