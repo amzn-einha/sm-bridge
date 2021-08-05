@@ -5,4 +5,4 @@ services:
     main:
         dependencies:
             - aws.greengrass.clientDevices.sm.bridge
-            - aws.greengrass.StreamManager
+           # - aws.greengrass.StreamManager

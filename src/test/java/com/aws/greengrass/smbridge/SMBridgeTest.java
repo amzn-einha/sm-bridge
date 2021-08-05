@@ -114,7 +114,7 @@ public class SMBridgeTest extends GGServiceTestUtil {
     }
 
     @Test
-    void GIVEN_Greengrass_with_sm_bridge_WHEN_valid_mqttTopicMapping_updated_THEN_mapping_updated() throws Exception {
+    void GIVEN_Greengrass_with_sm_bridge_WHEN_valid_mqttStreamMapping_updated_THEN_mapping_updated() throws Exception {
         startKernelWithConfig("config.yaml");
         TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));

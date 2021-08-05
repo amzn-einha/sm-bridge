@@ -1,12 +1,12 @@
 services:
-  aws.greengrass.MqttBridge:
+  aws.greengrass.clientDevices.sm.bridge:
     parameters:
       brokerServerUri: 'tcp://localhost:8883'
-      mqttTopicMapping: '[
+      mqttStreamMapping: '[
                            {"SourceTopic": "topic/to/iotCore", "SourceTopicType": "LocalMqtt", "DestTopic": "/test/cloud/topic", "DestTopicType": "IotCore"},
                            {"SourceTopic": "topic/to/pubsub", "SourceTopicType": "LocalMqtt", "DestTopic": "/test/pubsub/topic", "DestTopicType": "Pubsub"},
                            {"SourceTopic": "topic/to/iotCore/2", "SourceTopicType": "LocalMqtt", "DestTopic": "/test/cloud/topic2", "DestTopicType": "IotCore"}
                          ]'
   main:
     dependencies:
-      - aws.greengrass.MqttBridge
+      - aws.greengrass.clientDevices.sm.bridge
