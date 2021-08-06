@@ -1,5 +1,5 @@
 services:
-  aws.greengrass.clientDevices.sm.bridge:
+  aws.greengrass.smbridge:
     parameters:
       brokerServerUri: 'tcp://localhost:8883'
       mqttStreamMapping: '[
@@ -9,4 +9,4 @@ services:
                          ]'
   main:
     dependencies:
-      - aws.greengrass.clientDevices.sm.bridge
+      - aws.greengrass.smbridge
