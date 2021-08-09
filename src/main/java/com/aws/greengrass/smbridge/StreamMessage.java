@@ -5,15 +5,13 @@
 
 package com.aws.greengrass.smbridge;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Value;
 
 /**
  * Common representation of a Message.
  */
-@AllArgsConstructor
-@Getter
-public class Message {
-    private String topic;
+@Value
+public class StreamMessage {
+    private String stream;
     private byte[] payload;
 }
