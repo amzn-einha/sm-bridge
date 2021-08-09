@@ -26,7 +26,10 @@ public class SMClient {
     private static final Logger LOGGER = LogManager.getLogger(SMClient.class);
 
     private StreamManagerClient smClient;
+    // The default stream receives all messages on reserved topics that have not been configured
+    // to go to another user-configured stream.
     private MessageStreamDefinition defaultStream;
+    // TODO: Configurable MessageStreamDefinition for default settings of a specified but not-yet-created stream
     /**
      * Ctr for SMClient.
      *
@@ -36,8 +39,9 @@ public class SMClient {
     @Inject
     public SMClient(Topics topics) throws SMClientException {
         this(topics, null);
-        // TODO: Handle the case when serverUri is modified
         try {
+            // TODO: Discover non-default SM port
+            //  https://docs.aws.amazon.com/greengrass/v2/developerguide/use-stream-manager-in-custom-components.html
             this.smClient = StreamManagerClientFactory.standard().build();
         } catch (StreamManagerException e) {
             throw new SMClientException("Unable to create a SM client", e);
@@ -52,42 +56,40 @@ public class SMClient {
         this.defaultStream.setStrategyOnFull(StrategyOnFull.RejectNewData);
     }
 
-    // TODO: Connect to stream manager on custom port
-    //  https://docs.aws.amazon.com/greengrass/v2/developerguide/use-stream-manager-in-custom-components.html
     public void start() throws SMClientException {
         try {
             updateOrCreateStream(defaultStream);
         } catch (StreamManagerException e) {
-            LOGGER.atError().log("Encountered StreamManagerException while starting SM Client");
-            throw new SMClientException("Unable to start SMClient");
+            LOGGER.atError().log("Failed to create or update the default stream", e);
         }
     }
 
     public void publishOnDefaultStream(byte[] payload) throws SMClientException{
         // TODO: Configurable default stream name
-        String defaultStreamName = "mqttToStreamDefaultStreamName";
-        publish(new StreamMessage(defaultStreamName, payload));
+        publish(new StreamMessage(defaultStream.getName(), payload));
     }
 
     public void publish(StreamMessage message) throws SMClientException{
         try {
             if (!checkStreamExists(message.getStream())) {
-                // TODO: Configurable default stream
+                // TODO: see todo about about configuring specified but uninstantiated streams
                 MessageStreamDefinition newStream = new MessageStreamDefinition();
                 newStream.setName(message.getStream());
                 newStream.setTimeToLiveMillis(9223372036854L);
                 newStream.setStrategyOnFull(StrategyOnFull.RejectNewData);
                 createStream(newStream);
+                LOGGER.atInfo().kv("Stream", message.getStream()).log("Created new stream");
             }
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).setCause(e).log("Unable to create stream");
+            LOGGER.atError().kv("Stream", message.getStream()).setCause(e).log("Unable to create stream");
             return;
         }
 
         try {
             long sequenceNumber = smClient.appendMessage(message.getStream(), message.getPayload());
+            LOGGER.atInfo().kv("Stream", message.getStream()).log("Appended message to string");
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).setCause(e).log("Unable to append to stream");
+            LOGGER.atError().kv("Stream", message.getStream()).setCause(e).log("Unable to append to stream");
         }
     }
 
@@ -99,9 +101,13 @@ public class SMClient {
         }
     }
 
-    private boolean checkStreamExists(String stream) throws StreamManagerException {
-        List<String> streams = smClient.listStreams();
-        return streams.contains(stream);
+    private boolean checkStreamExists(String stream) {
+        try {
+            MessageStreamInfo msi = smClient.describeMessageStream(stream);
+            return true;
+        } catch (StreamManagerException e) {
+            return false;
+        }
     }
 
     private void updateStream(MessageStreamDefinition msd) throws StreamManagerException {

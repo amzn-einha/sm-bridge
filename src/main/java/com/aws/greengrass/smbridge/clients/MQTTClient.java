@@ -9,6 +9,7 @@ import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
+import com.aws.greengrass.smbridge.SMBridge;
 import com.aws.greengrass.smbridge.MQTTMessage;
 import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.util.Coerce;
@@ -97,7 +98,11 @@ public class MQTTClient {
         // TODO: Handle the case when serverUri is modified
         try {
             this.mqttClientInternal = new MqttClient(serverUri, clientId, dataStore);
+            LOGGER.atInfo().kv("Server URI", serverUri).kv("Client ID", clientId)
+                .log("Created new MQTT client");
         } catch (MqttException e) {
+            LOGGER.atError().setCause(e).kv("Server URI", serverUri).kv("Client ID", clientId)
+                .log("Failed to create new MQTT client");
             throw new MQTTClientException("Unable to create an MQTT client", e);
         }
     }
@@ -128,6 +133,7 @@ public class MQTTClient {
         try {
             connectAndSubscribe();
         } catch (KeyStoreException e) {
+            LOGGER.atError().setCause(e).log("Failed to connect and subscribe to Broker");
             throw new RuntimeException(e);
         }
     }
@@ -142,6 +148,7 @@ public class MQTTClient {
         try {
             connectAndSubscribe();
         } catch (KeyStoreException e) {
+            LOGGER.atError().setCause(e).log("Failed to connect and subscribe to Broker");
             throw new RuntimeException(e);
         }
     }

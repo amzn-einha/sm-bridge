@@ -33,7 +33,6 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     private MQTTClient mqttClient;
-    private SMClient smClient;
 
     // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
     // append-values.
@@ -52,16 +51,7 @@ public class MessageBridge {
         processMapping();
     }
 
-    public void addOrReplaceMqttClient(MQTTClient mqttClient){
-        this.mqttClient = mqttClient;
-        updateSubscriptionsForClient(mqttClient);
-    }
-
-    public void addOrReplaceSMClient(SMClient smClient){
-        this.smClient = smClient;
-    }
-
-    private void handleMessage(MQTTMessage message) {
+    private void handleMessage(Message message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
@@ -116,7 +106,7 @@ public class MessageBridge {
     }
 
     private void processMapping() {
-        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getList();
+        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
         Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
@@ -133,6 +123,11 @@ public class MessageBridge {
             updateSubscriptionsForClient(mqttClient);
         }
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
+    }
+
+    public void addOrReplaceMqttClient(MQTTClient mqttClient){
+        this.mqttClient = mqttClient;
+        updateSubscriptionsForClient(mqttClient);
     }
 
     private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
