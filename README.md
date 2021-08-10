@@ -1,6 +1,6 @@
-## AWS Greengrass MQTT Bridge
+## AWS Greengrass SM Bridge
 
-MQTT Bridge is a Greengrass component that manages the communications between MQTT broker and the rest of Greengrass system, specifically PubSub and MQTT Proxy.
+SM Bridge is a Greengrass component that automates message forwarding from MQTT broker to Greengrass Stream Manager. 
 
 ## Security
 
