@@ -11,9 +11,12 @@ import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
+import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -33,6 +36,7 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     private MQTTClient mqttClient;
+    private SMClient smClient;
 
     // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
     // append-values.
@@ -51,7 +55,7 @@ public class MessageBridge {
         processMapping();
     }
 
-    private void handleMessage(Message message) {
+    private void handleMessage(MQTTMessage message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
@@ -61,34 +65,32 @@ public class MessageBridge {
             final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
                 String stream = destination.getStream();
                 StreamMessage streamMessage;
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
+                byte[] payload;
+                JSONObject jsonObject = new JSONObject();
 
                 if (destination.isAppendTime()){
                     DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
                     LocalDateTime now = LocalDateTime.now();
-                    String stringTime = dtf.format(now) + ": ";
-                    byte[] time = stringTime.getBytes();
-                    try {
-                        byteArrayOutputStream.write(time);
-                    } catch (IOException e) {
-                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
-                    }
+                    String stringTime = dtf.format(now);
+
+                    jsonObject.put("timestamp", stringTime);
                 }
                 if (destination.isAppendTopic()){
-                    String stringTopic = message.getTopic() + ": ";
-                    byte[] topic = stringTopic.getBytes();
-                    try {
-                        byteArrayOutputStream.write(topic);
-                    } catch (IOException e) {
-                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
-                    }
+                    jsonObject.put("topic", message.getTopic());
                 }
-                try {
-                    byteArrayOutputStream.write(message.getPayload());
-                } catch (IOException e) {
-                    LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
+                if (!jsonObject.isEmpty()) {
+                    byte[] jsonBytes = jsonObject.toString().getBytes();
+                    byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
+                    payload = new byte[2 + jsonBytes.length + message.getPayload().length];
+
+                    System.arraycopy(headerLengthInBytes, 0, payload, 0, 2);
+                    System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
+                    System.arraycopy(
+                            message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
+                } else {
+                    payload = message.getPayload();
                 }
-                streamMessage = new StreamMessage(stream, byteArrayOutputStream.toByteArray());
+                streamMessage = new StreamMessage(stream, payload);
                 try {
                     smClient.publish(streamMessage);
                     LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
@@ -106,7 +108,7 @@ public class MessageBridge {
     }
 
     private void processMapping() {
-        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
+        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getList();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
         Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
