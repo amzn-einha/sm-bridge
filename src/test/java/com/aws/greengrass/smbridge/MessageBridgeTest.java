@@ -57,10 +57,11 @@ public class MessageBridgeTest {
         messageBridge.addOrReplaceMqttClient(mockMqttClient);
         ArgumentCaptor<Set<String>> topicsArgumentCaptor = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptor.capture(), any());
-        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(3));
+        // We expect one more than the mapping, because it listens to the default topic as well
+        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(4));
         MatcherAssert
                 .assertThat(topicsArgumentCaptor.getValue(), Matchers.containsInAnyOrder(
-                        "mqtt/topic", "mqtt/topic2", "mqtt/topic3"));
+                        "mqtt/topic", "mqtt/topic2", "mqtt/topic3", SMBridge.RESERVED_TOPIC));
     }
 
     @Test
@@ -82,10 +83,11 @@ public class MessageBridgeTest {
 
         ArgumentCaptor<Set<String>> topicsArgumentCaptor = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptor.capture(), any());
-        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(6));
+        // We expect one more than the mapping, because it listens to the default topic as well
+        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(7));
         MatcherAssert.assertThat(topicsArgumentCaptor.getValue(),
                 Matchers.containsInAnyOrder(
-                        "mqtt/topic", "mqtt/topic2", "mqtt/topic/#", "mqtt/topic3", "mqtt/topic4", "mqtt/+/topic"));
+                        "mqtt/topic", "mqtt/topic2", "mqtt/topic/#", "mqtt/topic3", "mqtt/topic4", "mqtt/+/topic", SMBridge.RESERVED_TOPIC));
     }
 
     @Test
@@ -117,18 +119,22 @@ public class MessageBridgeTest {
 
         ArgumentCaptor<Set<String>> topicsArgumentCaptorLocalMqtt = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptorLocalMqtt.capture(), any());
-        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(4));
+        // We expect one more than the mapping, because it listens to the default topic as well
+        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(5));
         MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(),
-                Matchers.containsInAnyOrder("mqtt/topic", "mqtt/topic2/changed", "mqtt/topic3/added", "mqtt/topic3"));
+                Matchers.containsInAnyOrder("mqtt/topic", "mqtt/topic2/changed", "mqtt/topic3/added", "mqtt/topic3", SMBridge.RESERVED_TOPIC));
 
         // Remove client
         reset(mockMqttClient);
         mapping.updateMapping(Collections.EMPTY_MAP);
         topicsArgumentCaptorLocalMqtt = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptorLocalMqtt.capture(), any());
-        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(0));
+        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(1));
+        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(),
+                Matchers.containsInAnyOrder(SMBridge.RESERVED_TOPIC));
 
-        }
+
+    }
 
     @Test
     void GIVEN_sm_bridge_and_mapping_populated_WHEN_receive_mqtt_message_THEN_routed_to_sm() throws Exception {

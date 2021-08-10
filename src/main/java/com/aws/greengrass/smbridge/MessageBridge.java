@@ -33,6 +33,7 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     private MQTTClient mqttClient;
+    private SMClient smClient;
 
     // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
     // append-values.
@@ -51,7 +52,56 @@ public class MessageBridge {
         processMapping();
     }
 
-    private void handleMessage(Message message) {
+    public void addOrReplaceMqttClient(MQTTClient mqttClient) {
+        this.mqttClient = mqttClient;
+        updateSubscriptionsForClient(mqttClient);
+    }
+
+    public void addOrReplaceSMClient(SMClient smClient) {
+        this.smClient = smClient;
+    }
+
+    private byte[] preparePayload(boolean appendTime, boolean appendTopic, MQTTMessage message) {
+        // first byte of header tells you the length of the header
+        // header encoded as JSON (if someone wants to skip header, they can just read length of header)? Or plain text?
+        // Extend JSON to wrap the whole thing (no!)?
+        // If no JSON, document binary schema and say that the first field is /n/ number of bytes
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
+        if (appendTime) {
+            try {
+                byteArrayOutputStream.write(appendTime());
+            } catch (IOException e) {
+                LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
+            }
+        }
+        if (appendTopic) {
+            try {
+                byteArrayOutputStream.write(appendTopic(message.getTopic()));
+            } catch (IOException e) {
+                LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
+            }
+        }
+        try {
+            byteArrayOutputStream.write(message.getPayload());
+        } catch (IOException e) {
+            LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
+        }
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    private byte[] appendTime() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
+        LocalDateTime now = LocalDateTime.now();
+        String stringTime = dtf.format(now) + ": ";
+        return stringTime.getBytes();
+    }
+
+    private byte [] appendTopic(String topic) {
+        String stringTopic = topic + ": ";
+        return stringTopic.getBytes();
+    }
+
+    private void handleMessage(MQTTMessage message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
@@ -60,35 +110,8 @@ public class MessageBridge {
         if (sourceDestinationMap != null) {
             final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
                 String stream = destination.getStream();
-                StreamMessage streamMessage;
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
-
-                if (destination.isAppendTime()){
-                    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
-                    LocalDateTime now = LocalDateTime.now();
-                    String stringTime = dtf.format(now) + ": ";
-                    byte[] time = stringTime.getBytes();
-                    try {
-                        byteArrayOutputStream.write(time);
-                    } catch (IOException e) {
-                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
-                    }
-                }
-                if (destination.isAppendTopic()){
-                    String stringTopic = message.getTopic() + ": ";
-                    byte[] topic = stringTopic.getBytes();
-                    try {
-                        byteArrayOutputStream.write(topic);
-                    } catch (IOException e) {
-                        LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
-                    }
-                }
-                try {
-                    byteArrayOutputStream.write(message.getPayload());
-                } catch (IOException e) {
-                    LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
-                }
-                streamMessage = new StreamMessage(stream, byteArrayOutputStream.toByteArray());
+                StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
+                        destination.isAppendTime(), destination.isAppendTopic(), message));
                 try {
                     smClient.publish(streamMessage);
                     LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
@@ -97,16 +120,30 @@ public class MessageBridge {
                     LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
                 }
             };
-            // Perform topic matching on filter
+            // Perform topic matching on filter from mapped topics/destinations
             sourceDestinationMap.entrySet().stream().filter(
                     mapping -> MqttTopic.isMatched(mapping.getKey(), sourceTopic))
                     .map(Map.Entry::getValue)
                     .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
+
+            // Perform topic matching against reserved topic
+            if (MqttTopic.isMatched(SMBridge.RESERVED_TOPIC, sourceTopic)) {
+                String stream = sourceTopic.split("/")[1];
+                StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
+                        SMBridge.APPEND_TIME_DEFAULT_STREAM, SMBridge.APPEND_TOPIC_DEFAULT_STREAM, message));
+                try {
+                    smClient.publish(streamMessage);
+                    LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
+                            .log("Published message");
+                } catch (SMClientException e) {
+                    LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
+                }
+            }
         }
     }
 
     private void processMapping() {
-        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
+        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getList();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
         Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
@@ -125,18 +162,14 @@ public class MessageBridge {
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 
-    public void addOrReplaceMqttClient(MQTTClient mqttClient){
-        this.mqttClient = mqttClient;
-        updateSubscriptionsForClient(mqttClient);
-    }
-
     private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
         Set<String> topicsToSubscribe;
         if (sourceDestinationMap == null) {
             topicsToSubscribe = new HashSet<>();
         } else {
-            topicsToSubscribe = sourceDestinationMap.keySet();
+            topicsToSubscribe = new HashSet<>(sourceDestinationMap.keySet());
         }
+        topicsToSubscribe.add(SMBridge.RESERVED_TOPIC);
 
         LOGGER.atDebug().kv("topics", topicsToSubscribe).log("Updating subscriptions");
 

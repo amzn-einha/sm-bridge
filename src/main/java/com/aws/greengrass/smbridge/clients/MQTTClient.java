@@ -140,10 +140,8 @@ public class MQTTClient {
 
     /**
      * Start the {@link MQTTClient}.
-     *
-     * @throws RuntimeException if the client cannot load the KeyStore used to connect to the broker
      */
-    public void start() throws RuntimeException {
+    public void start() {
         mqttClientInternal.setCallback(mqttCallback);
         try {
             connectAndSubscribe();
@@ -187,6 +185,12 @@ public class MQTTClient {
         });
     }
 
+    /**
+     * Called to update the client's subscribed topics.
+     *
+     * @param topics         The set of topics to subscribe to
+     * @param messageHandler The handler for messages
+     */
     public synchronized void updateSubscriptions(Set<String> topics, Consumer<MQTTMessage> messageHandler) {
         this.messageHandler = messageHandler;
 
@@ -198,7 +202,7 @@ public class MQTTClient {
         }
     }
 
-    private synchronized void updateSubscriptionsInternal(){
+    private synchronized void updateSubscriptionsInternal() {
         Set<String> topicsToRemove = new HashSet<>(subscribedLocalMqttTopics);
         topicsToRemove.removeAll(toSubscribeLocalMqttTopics);
         topicsToRemove.forEach(s -> {
@@ -272,7 +276,6 @@ public class MQTTClient {
     }
 
     private synchronized void resubscribe() {
-        Set<String> topicsToResubscribe = new HashSet<>(subscribedLocalMqttTopics);
         subscribedLocalMqttTopics.clear();
         // Resubscribe to topics
         updateSubscriptionsInternal();

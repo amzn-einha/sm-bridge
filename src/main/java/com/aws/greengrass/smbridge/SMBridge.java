@@ -19,8 +19,6 @@ import com.aws.greengrass.smbridge.auth.CsrGeneratingException;
 import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.MQTTClientException;
-
-import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
 import com.aws.greengrass.util.Coerce;
@@ -34,7 +32,6 @@ import lombok.Getter;
 import java.io.IOException;
 import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +45,6 @@ public class SMBridge extends PluginService {
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
     private final TopicMapping topicMapping;
     private final StreamDefinition streamDefinition;
-    private final MessageStreamDefinition defaultStreamDefinition;
 
     private final MessageBridge messageBridge;
     private final Kernel kernel;
@@ -60,31 +56,36 @@ public class SMBridge extends PluginService {
             JsonMapper.builder().enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES).build();
     static final String MQTT_STREAM_MAPPING = "mqttStreamMapping";
     static final String STREAM_DEFINITION = "streamDefinition";
-    static final String DEFAULT_STREAM_DEFINITION = "defaultStreamDefinition";
+    static final String RESERVED_TOPIC = "$SM-BRIDGE/+/#";
+    static boolean SINGLE_DEFAULT_STREAM = true;
+    static boolean APPEND_TIME_DEFAULT_STREAM = true;
+    static boolean APPEND_TOPIC_DEFAULT_STREAM = true;
     private Topics mappingConfigTopics;
     private Topics streamsConfigTopics;
-    private Topics defaultConfigTopics;
 
     /**
      * Ctr for SMBridge.
      *
      * @param topics             topics passed by by the Nucleus
      * @param topicMapping       mapping of mqtt topics to iotCore/pubsub topics
+     * @param streamDefinition   definition of streams to be configured
      * @param kernel             Greengrass kernel
      * @param executorService    Executor Service
      * @param mqttClientKeyStore KeyStore for MQTT Client
      */
     @Inject
-    public SMBridge(Topics topics, TopicMapping topicMapping, Kernel kernel,
+    public SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition, Kernel kernel,
                     MQTTClientKeyStore mqttClientKeyStore, ExecutorService executorService) {
-        this(topics, topicMapping, new MessageBridge(topicMapping), kernel,
+        this(topics, topicMapping, streamDefinition, new MessageBridge(topicMapping), kernel,
              mqttClientKeyStore, executorService);
     }
 
-    protected SMBridge(Topics topics, TopicMapping topicMapping, MessageBridge messageBridge,
-                       Kernel kernel, MQTTClientKeyStore mqttClientKeyStore, ExecutorService executorService) {
+    protected SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition,
+                       MessageBridge messageBridge, Kernel kernel, MQTTClientKeyStore mqttClientKeyStore,
+                       ExecutorService executorService) {
         super(topics);
         this.topicMapping = topicMapping;
+        this.streamDefinition = streamDefinition;
         this.kernel = kernel;
         this.mqttClientKeyStore = mqttClientKeyStore;
         this.messageBridge = messageBridge;
@@ -99,11 +100,8 @@ public class SMBridge extends PluginService {
         streamsConfigTopics =
                 this.config.lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, STREAM_DEFINITION);
 
-        defaultConfigTopics =
-                this.config.lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, DEFAULT_STREAM_DEFINITION);
-
-        mappingConfigTopics.subscribe(((whatHappened, node) -> {
-            if(mappingConfigTopics.isEmpty()) {
+        mappingConfigTopics.subscribe((whatHappened, node) -> {
+            if (mappingConfigTopics.isEmpty()) {
                 logger.debug("Mapping empty");
                 topicMapping.updateMapping(Collections.emptyMap());
                 return;
@@ -121,11 +119,12 @@ public class SMBridge extends PluginService {
                 // Currently, Nucleus spills all exceptions in std err which junit consider failures
                 serviceErrored(String.format("Invalid topic mapping. %s", e.getMessage()));
             }
-        }));
+        });
 
-        streamsConfigTopics.subscribe(((whatHappened, node) -> {
-            if(streamsConfigTopics.isEmpty()) {
+        streamsConfigTopics.subscribe((whatHappened, node) -> {
+            if (streamsConfigTopics.isEmpty()) {
                 logger.debug("Stream definition config empty");
+                streamDefinition.updateDefinition(Collections.emptyMap());
                 return;
             }
 
@@ -141,15 +140,7 @@ public class SMBridge extends PluginService {
                 // Currently, Nucleus spills all exceptions in std err which junit consider failures
                 serviceErrored(String.format("Invalid stream definitions. %s", e.getMessage()));
             }
-        }));
-
-        defaultConfigTopics.subscribe(((whatHappened, node) -> {
-            if(defaultConfigTopics.isEmpty()) {
-                logger.debug("Default stream config empty");
-                defaultConfigTopics.updateMapping(Collections.emptyMap());
-                return;
-            }
-        }));
+        });
     }
 
     @Override
@@ -195,8 +186,8 @@ public class SMBridge extends PluginService {
             return;
         }
 
-        try{
-            smClient = new SMClient(this.config);
+        try {
+            smClient = new SMClient(this.config, streamDefinition);
             smClient.start();
             messageBridge.addOrReplaceSMClient(smClient);
         } catch (SMClientException e) {

@@ -28,11 +28,11 @@ public class TopicMapping {
     @Getter
     private Map<String, MappingEntry> mapping = new HashMap<>();
 
-    public ArrayList<MappingEntry> getList(){
+    private List<UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
+
+    public List<MappingEntry> getList() {
         return new ArrayList<>(mapping.values());
     }
-
-    private List<UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
 
     /**
      * A single entry in the mapping.
@@ -69,7 +69,7 @@ public class TopicMapping {
     }
 
     /**
-     * Update the topic mapping to the passed argument
+     * Update the topic mapping to the passed argument.
      *
      * @param mapping       mapping from entry key to mapping entry 
      */

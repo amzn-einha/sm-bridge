@@ -6,8 +6,9 @@
 package com.aws.greengrass.smbridge;
 
 import com.amazonaws.greengrass.streammanager.model.MessageStreamDefinition;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,91 +18,40 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 
 /**
- *  Stream definitions to create new streams in SM Client
+ *  Stream definitions to create new streams in SM Client.
  */
+@NoArgsConstructor
 public class StreamDefinition {
     @Getter
-    private Map<String, StreamDefinitionEntry> streams = new HashMap<>();
+    private Map<String, MessageStreamDefinition> streams = new HashMap<>();
 
-    public ArrayList<MessageStreamDefinition> getList() {
-        return new ArrayList<>(streams.values())
+    private List<StreamDefinition.UpdateListener> updateListeners = new CopyOnWriteArrayList<>();
+
+    public void addEntry(String key, MessageStreamDefinition messageStreamDefinition) {
+        streams.put(key, messageStreamDefinition);
     }
 
-    ;
-
-    /**
-     * * A single message stream definition (wrapper), where all values are primitive
-     */
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @EqualsAndHashCode
-    public static class StreamDefinitionEntry {
-        @Getter
-        @JsonProperty("name")
-        private String name = "mqttToStreamDefaultStreamName";
-        @Getter
-        @JsonProperty("maxSize")
-        private long maxSize = 268435456L;
-        @Getter
-        @JsonProperty("streamSegmentSize")
-        private long streamSegmentSize = 16777216L;
-        @Getter
-        @JsonProperty("ttl")
-        private long ttl = 9223372036854L;
-        @Getter
-        @JsonProperty("strategyOnFull")
-        private String strategyOnFull = "OverwriteOldestData";
-        @Getter
-        @JsonProperty("persistence")
-        private String persistence = "File";
-        @Getter
-        @JsonProperty("flushOnWrite")
-        private boolean flushOnWrite = false;
-        @Getter
-        @JsonProperty("exportDefinition")
-        private exportDefinitionEntry exportDefinition = new exportDefinitionEntry();
-
-        @Override
-        public String toString() {
-            return String.format(
-                    "{name: %s, maxSiz: %d, segmentSize: %d, ttl: %d, strategyOnFull: %s, persistence: %s, " +
-                            "flushOnWrite: %b, exportDefinition: %s}", name, maxSize, streamSegmentSize, ttl,
-                    strategyOnFull, persistence, flushOnWrite, exportDefinition
-            );
-        }
+    public List<MessageStreamDefinition> getList() {
+        return new ArrayList<>(streams.values());
     }
 
-
-    public static class exportDefinitionEntry {
-
-    }
-
-    public void updateDefinition(@NonNull Map<String, StreamDefinitionEntry> mapping) {
-        this.streams = mapping;
-    }
-
-}
-
-/*
     @FunctionalInterface
     public interface UpdateListener {
         void onUpdate();
     }
 
     /**
-     * Update the topic mapping to the passed argument
+     * Update the definition map to the passed argument.
      *
-     * @param mapping       mapping to update
+     * @param mapping   the key-definition mapping to be updated
      */
-  /*  public void updateMapping(@NonNull Map<String, MappingEntry> mapping) {
-        // TODO: Check for duplicates, General validation + unit tests. Topic strings need to be validated (allowed
-        //  filter?, etc)
-        this.mapping = mapping;
+    public void updateDefinition(@NonNull Map<String, MessageStreamDefinition> mapping) {
+        this.streams = mapping;
         updateListeners.forEach(UpdateListener::onUpdate);
     }
 
     public void listenToUpdates(UpdateListener listener) {
         updateListeners.add(listener);
     }
+
 }
-*/
