@@ -9,7 +9,6 @@ import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.smbridge.SMBridge;
 import com.aws.greengrass.smbridge.MQTTMessage;
 import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
 import com.aws.greengrass.util.Coerce;

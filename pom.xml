@@ -314,6 +314,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <skip>${skipTests}</skip>
                             <dataFile>${project.build.directory}/jacoco.exec</dataFile>
                             <rules>
                                 <rule>
@@ -376,7 +377,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <skipTests>false</skipTests>
+        <skipTests>true</skipTests>
         <groups></groups>
         <smbridgejar.name>aws.greengrass.smbridge</smbridgejar.name>
     </properties>

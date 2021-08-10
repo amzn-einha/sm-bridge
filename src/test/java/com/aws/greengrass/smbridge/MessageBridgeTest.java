@@ -156,11 +156,11 @@ public class MessageBridgeTest {
 
         byte[] messageOnTopic1 = "message from topic mqtt/topic".getBytes();
         byte[] messageOnTopic2 = "message from topic mqtt/topic2".getBytes();
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic", messageOnTopic1));
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic2", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic", messageOnTopic1));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic2", messageOnTopic2));
 
         // Also send on an unknown topic
-        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/unknown", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/unknown", messageOnTopic2));
 
         ArgumentCaptor<StreamMessage> messageSmCaptor = ArgumentCaptor.forClass(StreamMessage.class);
         verify(mockSmClient, times(2)).publish(messageSmCaptor.capture());
