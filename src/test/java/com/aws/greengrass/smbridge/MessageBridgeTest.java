@@ -320,29 +320,5 @@ public class MessageBridgeTest {
                 Matchers.is(Matchers.equalTo("default-stream")));
         Assertions.assertEquals(GenericMessage.getBytes().length, messageCaptor.getAllValues().get(0).getPayload().length);
         Assertions.assertEquals(GenericMessage.getBytes()[1], messageCaptor.getAllValues().get(0).getPayload()[1]);
-/*
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(1).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream")));
-        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(1).getPayload());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(2).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream6")));
-        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(2).getPayload());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(3).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream5")));
-        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(3).getPayload());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(4).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream")));
-        Assertions.assertArrayEquals(messageFromThermostat2, messageCaptor.getAllValues().get(4).getPayload());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(5).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream6")));
-        Assertions.assertArrayEquals(messageFromThermostat2, messageCaptor.getAllValues().get(5).getPayload());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(6).getStream(),
-                Matchers.is(Matchers.equalTo("RandomStream5")));
-        Assertions.assertArrayEquals(messageFromThermostat2Temp, messageCaptor.getAllValues().get(6).getPayload());*/
     }
 }

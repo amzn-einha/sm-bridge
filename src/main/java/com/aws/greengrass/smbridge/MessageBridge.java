@@ -13,8 +13,6 @@ import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;

@@ -139,12 +139,6 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/lib/aws-greengrass-stream-manager-sdk-java-slim.jar</systemPath>
         </dependency>
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>RELEASE</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
     <build>
         <plugins>
