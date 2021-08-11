@@ -193,11 +193,11 @@ public class MessageBridgeTest {
         verify(mockMqttClient, times(1)).updateSubscriptions(any(), messageHandlerLocalMqttCaptor.capture());
 
         byte[] messageOnTopic1 = "message from topic mqtt/topic".getBytes();
-        String GenericMessageOnTopic1 = "yyyy/MM/dd HH:mm:ss.SSSSSS: message from topic mqtt/topic";
+        String GenericMessageOnTopic1 = "xx{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\"}message from topic mqtt/topic";
         byte[] messageOnTopic2 = "message from topic mqtt/topic2".getBytes();
-        String GenericMessageOnTopic2 = "mqtt/topic2: message from topic mqtt/topic2";
+        String GenericMessageOnTopic2 = "\0" + new Character((char) 23).toString() + "{\"topic\":\"mqtt/topic2\"}message from topic mqtt/topic2";
         byte[] messageOnTopic3 = "message from topic mqtt/topic3".getBytes();
-        String GenericMessageOnTopic3 = "yyyy/MM/dd HH:mm:ss.SSSSSS: mqtt/topic3: message from topic mqtt/topic3";
+        String GenericMessageOnTopic3 = "xx{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\",\"topic\":\"mqtt/topic3\"}message from topic mqtt/topic3";
 
         messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic", messageOnTopic1));
         messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic2", messageOnTopic2));
@@ -290,5 +290,59 @@ public class MessageBridgeTest {
         MatcherAssert.assertThat(messageCaptor.getAllValues().get(6).getStream(),
                 Matchers.is(Matchers.equalTo("RandomStream5")));
         Assertions.assertArrayEquals(messageFromThermostat2Temp, messageCaptor.getAllValues().get(6).getPayload());
+    }
+
+    @Test
+    void GIVEN_sm_bridge_WHEN_receive_mqtt_message_on_reserved_topic_THEN_routed_correctly() throws Exception {
+        MessageBridge messageBridge = new MessageBridge(new TopicMapping());
+
+        messageBridge.addOrReplaceMqttClient(mockMqttClient);
+        messageBridge.addOrReplaceSMClient(mockSmClient);
+
+        ArgumentCaptor<Consumer> messageHandlerLocalMqttCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(mockMqttClient, times(1)).updateSubscriptions(any(), messageHandlerLocalMqttCaptor.capture());
+
+        byte[] messageFromThermostat1 = "humidity = 40%".getBytes();
+        String GenericMessage = "x" + new Character((char) 87).toString() +
+                "{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\",\"topic\":\"$SM-BRIDGE/default-stream/message1\"}humidity = 40%";
+        byte[] messageFromThermostat2 = "humidity = 41%".getBytes();
+
+        messageHandlerLocalMqttCaptor.getValue()
+                .accept(new MQTTMessage("$SM-BRIDGE/default-stream/message1", messageFromThermostat1));
+        messageHandlerLocalMqttCaptor.getValue()
+                .accept(new MQTTMessage("$SM-BRIDGE", messageFromThermostat2));
+
+
+        ArgumentCaptor<StreamMessage> messageCaptor = ArgumentCaptor.forClass(StreamMessage.class);
+        verify(mockSmClient, times(1)).publish(messageCaptor.capture());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(0).getStream(),
+                Matchers.is(Matchers.equalTo("default-stream")));
+        Assertions.assertEquals(GenericMessage.getBytes().length, messageCaptor.getAllValues().get(0).getPayload().length);
+        Assertions.assertEquals(GenericMessage.getBytes()[1], messageCaptor.getAllValues().get(0).getPayload()[1]);
+/*
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(1).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream")));
+        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(1).getPayload());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(2).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream6")));
+        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(2).getPayload());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(3).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream5")));
+        Assertions.assertArrayEquals(messageFromThermostat1, messageCaptor.getAllValues().get(3).getPayload());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(4).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream")));
+        Assertions.assertArrayEquals(messageFromThermostat2, messageCaptor.getAllValues().get(4).getPayload());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(5).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream6")));
+        Assertions.assertArrayEquals(messageFromThermostat2, messageCaptor.getAllValues().get(5).getPayload());
+
+        MatcherAssert.assertThat(messageCaptor.getAllValues().get(6).getStream(),
+                Matchers.is(Matchers.equalTo("RandomStream5")));
+        Assertions.assertArrayEquals(messageFromThermostat2Temp, messageCaptor.getAllValues().get(6).getPayload());*/
     }
 }
