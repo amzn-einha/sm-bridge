@@ -72,7 +72,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.20</version>
+            <version>1.18.10</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -313,7 +313,6 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
-                            <skip>${skipTests}</skip>
                             <dataFile>${project.build.directory}/jacoco.exec</dataFile>
                             <rules>
                                 <rule>
@@ -347,7 +346,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>${smbridgejar.name}</finalName>
+                            <finalName>${mqttbridgejar.name}</finalName>
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
@@ -376,9 +375,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <skipTests>true</skipTests>
+        <skipTests>false</skipTests>
         <groups></groups>
-        <smbridgejar.name>aws.greengrass.smbridge</smbridgejar.name>
+        <smbridgejar.name>aws.greengrass.clientdevices.sm.bridge</smbridgejar.name>
     </properties>
     <distributionManagement>
         <snapshotRepository>

@@ -57,11 +57,10 @@ public class MessageBridgeTest {
         messageBridge.addOrReplaceMqttClient(mockMqttClient);
         ArgumentCaptor<Set<String>> topicsArgumentCaptor = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptor.capture(), any());
-        // We expect one more than the mapping, because it listens to the default topic as well
-        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(4));
+        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(3));
         MatcherAssert
                 .assertThat(topicsArgumentCaptor.getValue(), Matchers.containsInAnyOrder(
-                        "mqtt/topic", "mqtt/topic2", "mqtt/topic3", SMBridge.RESERVED_TOPIC));
+                        "mqtt/topic", "mqtt/topic2", "mqtt/topic3"));
     }
 
     @Test
@@ -83,11 +82,10 @@ public class MessageBridgeTest {
 
         ArgumentCaptor<Set<String>> topicsArgumentCaptor = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptor.capture(), any());
-        // We expect one more than the mapping, because it listens to the default topic as well
-        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(7));
+        MatcherAssert.assertThat(topicsArgumentCaptor.getValue(), Matchers.hasSize(6));
         MatcherAssert.assertThat(topicsArgumentCaptor.getValue(),
                 Matchers.containsInAnyOrder(
-                        "mqtt/topic", "mqtt/topic2", "mqtt/topic/#", "mqtt/topic3", "mqtt/topic4", "mqtt/+/topic", SMBridge.RESERVED_TOPIC));
+                        "mqtt/topic", "mqtt/topic2", "mqtt/topic/#", "mqtt/topic3", "mqtt/topic4", "mqtt/+/topic"));
     }
 
     @Test
@@ -119,22 +117,18 @@ public class MessageBridgeTest {
 
         ArgumentCaptor<Set<String>> topicsArgumentCaptorLocalMqtt = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptorLocalMqtt.capture(), any());
-        // We expect one more than the mapping, because it listens to the default topic as well
-        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(5));
+        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(4));
         MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(),
-                Matchers.containsInAnyOrder("mqtt/topic", "mqtt/topic2/changed", "mqtt/topic3/added", "mqtt/topic3", SMBridge.RESERVED_TOPIC));
+                Matchers.containsInAnyOrder("mqtt/topic", "mqtt/topic2/changed", "mqtt/topic3/added", "mqtt/topic3"));
 
         // Remove client
         reset(mockMqttClient);
         mapping.updateMapping(Collections.EMPTY_MAP);
         topicsArgumentCaptorLocalMqtt = ArgumentCaptor.forClass(Set.class);
         verify(mockMqttClient, times(1)).updateSubscriptions(topicsArgumentCaptorLocalMqtt.capture(), any());
-        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(1));
-        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(),
-                Matchers.containsInAnyOrder(SMBridge.RESERVED_TOPIC));
+        MatcherAssert.assertThat(topicsArgumentCaptorLocalMqtt.getValue(), Matchers.hasSize(0));
 
-
-    }
+        }
 
     @Test
     void GIVEN_sm_bridge_and_mapping_populated_WHEN_receive_mqtt_message_THEN_routed_to_sm() throws Exception {
@@ -156,11 +150,11 @@ public class MessageBridgeTest {
 
         byte[] messageOnTopic1 = "message from topic mqtt/topic".getBytes();
         byte[] messageOnTopic2 = "message from topic mqtt/topic2".getBytes();
-        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic", messageOnTopic1));
-        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic2", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic", messageOnTopic1));
+        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/topic2", messageOnTopic2));
 
         // Also send on an unknown topic
-        messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/unknown", messageOnTopic2));
+        messageHandlerLocalMqttCaptor.getValue().accept(new Message("mqtt/unknown", messageOnTopic2));
 
         ArgumentCaptor<StreamMessage> messageSmCaptor = ArgumentCaptor.forClass(StreamMessage.class);
         verify(mockSmClient, times(2)).publish(messageSmCaptor.capture());
@@ -193,11 +187,11 @@ public class MessageBridgeTest {
         verify(mockMqttClient, times(1)).updateSubscriptions(any(), messageHandlerLocalMqttCaptor.capture());
 
         byte[] messageOnTopic1 = "message from topic mqtt/topic".getBytes();
-        String GenericMessageOnTopic1 = "xx{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\"}message from topic mqtt/topic";
+        String GenericMessageOnTopic1 = "yyyy/MM/dd HH:mm:ss.SSSSSS: message from topic mqtt/topic";
         byte[] messageOnTopic2 = "message from topic mqtt/topic2".getBytes();
-        String GenericMessageOnTopic2 = "\0" + new Character((char) 23).toString() + "{\"topic\":\"mqtt/topic2\"}message from topic mqtt/topic2";
+        String GenericMessageOnTopic2 = "mqtt/topic2: message from topic mqtt/topic2";
         byte[] messageOnTopic3 = "message from topic mqtt/topic3".getBytes();
-        String GenericMessageOnTopic3 = "xx{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\",\"topic\":\"mqtt/topic3\"}message from topic mqtt/topic3";
+        String GenericMessageOnTopic3 = "yyyy/MM/dd HH:mm:ss.SSSSSS: mqtt/topic3: message from topic mqtt/topic3";
 
         messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic", messageOnTopic1));
         messageHandlerLocalMqttCaptor.getValue().accept(new MQTTMessage("mqtt/topic2", messageOnTopic2));
@@ -290,35 +284,5 @@ public class MessageBridgeTest {
         MatcherAssert.assertThat(messageCaptor.getAllValues().get(6).getStream(),
                 Matchers.is(Matchers.equalTo("RandomStream5")));
         Assertions.assertArrayEquals(messageFromThermostat2Temp, messageCaptor.getAllValues().get(6).getPayload());
-    }
-
-    @Test
-    void GIVEN_sm_bridge_WHEN_receive_mqtt_message_on_reserved_topic_THEN_routed_correctly() throws Exception {
-        MessageBridge messageBridge = new MessageBridge(new TopicMapping());
-
-        messageBridge.addOrReplaceMqttClient(mockMqttClient);
-        messageBridge.addOrReplaceSMClient(mockSmClient);
-
-        ArgumentCaptor<Consumer> messageHandlerLocalMqttCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(mockMqttClient, times(1)).updateSubscriptions(any(), messageHandlerLocalMqttCaptor.capture());
-
-        byte[] messageFromThermostat1 = "humidity = 40%".getBytes();
-        String GenericMessage = "x" + new Character((char) 87).toString() +
-                "{\"timestamp\":\"yyyy/MM/dd HH:mm:ss.SSSSSS\",\"topic\":\"$SM-BRIDGE/default-stream/message1\"}humidity = 40%";
-        byte[] messageFromThermostat2 = "humidity = 41%".getBytes();
-
-        messageHandlerLocalMqttCaptor.getValue()
-                .accept(new MQTTMessage("$SM-BRIDGE/default-stream/message1", messageFromThermostat1));
-        messageHandlerLocalMqttCaptor.getValue()
-                .accept(new MQTTMessage("$SM-BRIDGE", messageFromThermostat2));
-
-
-        ArgumentCaptor<StreamMessage> messageCaptor = ArgumentCaptor.forClass(StreamMessage.class);
-        verify(mockSmClient, times(1)).publish(messageCaptor.capture());
-
-        MatcherAssert.assertThat(messageCaptor.getAllValues().get(0).getStream(),
-                Matchers.is(Matchers.equalTo("default-stream")));
-        Assertions.assertEquals(GenericMessage.getBytes().length, messageCaptor.getAllValues().get(0).getPayload().length);
-        Assertions.assertEquals(GenericMessage.getBytes()[1], messageCaptor.getAllValues().get(0).getPayload()[1]);
     }
 }
