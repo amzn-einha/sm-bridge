@@ -11,6 +11,7 @@ import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
+import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -62,43 +63,32 @@ public class MessageBridge {
     }
 
     private byte[] preparePayload(boolean appendTime, boolean appendTopic, MQTTMessage message) {
-        // first byte of header tells you the length of the header
-        // header encoded as JSON (if someone wants to skip header, they can just read length of header)? Or plain text?
-        // Extend JSON to wrap the whole thing (no!)?
-        // If no JSON, document binary schema and say that the first field is /n/ number of bytes
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
+        byte[] payload;
+        JSONObject jsonObject = new JSONObject();
+
         if (appendTime) {
-            try {
-                byteArrayOutputStream.write(appendTime());
-            } catch (IOException e) {
-                LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend time to payload");
-            }
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
+            LocalDateTime now = LocalDateTime.now();
+            String stringTime = dtf.format(now);
+
+            jsonObject.put("timestamp", stringTime);
         }
         if (appendTopic) {
-            try {
-                byteArrayOutputStream.write(appendTopic(message.getTopic()));
-            } catch (IOException e) {
-                LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to prepend topic to payload");
-            }
+            jsonObject.put("topic", message.getTopic());
         }
-        try {
-            byteArrayOutputStream.write(message.getPayload());
-        } catch (IOException e) {
-            LOGGER.atError().kv("Topic", message.getTopic()).log("Unable to copy payload from MQTT message");
+        if (!jsonObject.isEmpty()) {
+            byte[] jsonBytes = jsonObject.toString().getBytes();
+            byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
+            payload = new byte[2 + jsonBytes.length + message.getPayload().length];
+
+            System.arraycopy(headerLengthInBytes, 0, payload, 0, 2);
+            System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
+            System.arraycopy(
+                    message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
+        } else {
+            payload = message.getPayload();
         }
-        return byteArrayOutputStream.toByteArray();
-    }
-
-    private byte[] appendTime() {
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
-        LocalDateTime now = LocalDateTime.now();
-        String stringTime = dtf.format(now) + ": ";
-        return stringTime.getBytes();
-    }
-
-    private byte [] appendTopic(String topic) {
-        String stringTopic = topic + ": ";
-        return stringTopic.getBytes();
+        return payload;
     }
 
     private void handleMessage(MQTTMessage message) {
