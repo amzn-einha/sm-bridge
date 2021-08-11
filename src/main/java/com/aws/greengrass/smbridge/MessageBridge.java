@@ -13,6 +13,10 @@ import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -51,44 +55,6 @@ public class MessageBridge {
         processMapping();
     }
 
-    public void addOrReplaceMqttClient(MQTTClient mqttClient) {
-        this.mqttClient = mqttClient;
-        updateSubscriptionsForClient(mqttClient);
-    }
-
-    public void addOrReplaceSMClient(SMClient smClient) {
-        this.smClient = smClient;
-    }
-
-    private byte[] preparePayload(boolean appendTime, boolean appendTopic, MQTTMessage message) {
-        byte[] payload;
-        JSONObject jsonObject = new JSONObject();
-
-        if (appendTime) {
-            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
-            LocalDateTime now = LocalDateTime.now();
-            String stringTime = dtf.format(now);
-
-            jsonObject.put("timestamp", stringTime);
-        }
-        if (appendTopic) {
-            jsonObject.put("topic", message.getTopic());
-        }
-        if (!jsonObject.isEmpty()) {
-            byte[] jsonBytes = jsonObject.toString().getBytes();
-            byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
-            payload = new byte[2 + jsonBytes.length + message.getPayload().length];
-
-            System.arraycopy(headerLengthInBytes, 0, payload, 0, 2);
-            System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
-            System.arraycopy(
-                    message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
-        } else {
-            payload = message.getPayload();
-        }
-        return payload;
-    }
-
     private void handleMessage(MQTTMessage message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
@@ -98,8 +64,33 @@ public class MessageBridge {
         if (sourceDestinationMap != null) {
             final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
                 String stream = destination.getStream();
-                StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
-                        destination.isAppendTime(), destination.isAppendTopic(), message));
+                StreamMessage streamMessage;
+                byte[] payload;
+                JSONObject jsonObject = new JSONObject();
+
+                if (destination.isAppendTime()){
+                    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
+                    LocalDateTime now = LocalDateTime.now();
+                    String stringTime = dtf.format(now);
+
+                    jsonObject.put("timestamp", stringTime);
+                }
+                if (destination.isAppendTopic()){
+                    jsonObject.put("topic", message.getTopic());
+                }
+                if (!jsonObject.isEmpty()) {
+                    byte[] jsonBytes = jsonObject.toString().getBytes();
+                    byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
+                    payload = new byte[2 + jsonBytes.length + message.getPayload().length];
+
+                    System.arraycopy(headerLengthInBytes, 0, payload, 0, 2);
+                    System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
+                    System.arraycopy(
+                            message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
+                } else {
+                    payload = message.getPayload();
+                }
+                streamMessage = new StreamMessage(stream, payload);
                 try {
                     smClient.publish(streamMessage);
                     LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
@@ -108,25 +99,11 @@ public class MessageBridge {
                     LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
                 }
             };
-            // Perform topic matching on filter from mapped topics/destinations
+            // Perform topic matching on filter
             sourceDestinationMap.entrySet().stream().filter(
                     mapping -> MqttTopic.isMatched(mapping.getKey(), sourceTopic))
                     .map(Map.Entry::getValue)
                     .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
-
-            // Perform topic matching against reserved topic
-            if (MqttTopic.isMatched(SMBridge.RESERVED_TOPIC, sourceTopic)) {
-                String stream = sourceTopic.split("/")[1];
-                StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
-                        SMBridge.APPEND_TIME_DEFAULT_STREAM, SMBridge.APPEND_TOPIC_DEFAULT_STREAM, message));
-                try {
-                    smClient.publish(streamMessage);
-                    LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
-                            .log("Published message");
-                } catch (SMClientException e) {
-                    LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
-                }
-            }
         }
     }
 
@@ -150,14 +127,18 @@ public class MessageBridge {
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 
+    public void addOrReplaceMqttClient(MQTTClient mqttClient){
+        this.mqttClient = mqttClient;
+        updateSubscriptionsForClient(mqttClient);
+    }
+
     private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
         Set<String> topicsToSubscribe;
         if (sourceDestinationMap == null) {
             topicsToSubscribe = new HashSet<>();
         } else {
-            topicsToSubscribe = new HashSet<>(sourceDestinationMap.keySet());
+            topicsToSubscribe = sourceDestinationMap.keySet();
         }
-        topicsToSubscribe.add(SMBridge.RESERVED_TOPIC);
 
         LOGGER.atDebug().kv("topics", topicsToSubscribe).log("Updating subscriptions");
 
