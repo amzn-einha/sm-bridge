@@ -5,23 +5,16 @@
 
 package com.aws.greengrass.smbridge;
 
-import com.aws.greengrass.builtin.services.pubsub.PubSubIPCEventStreamAgent;
 import com.aws.greengrass.certificatemanager.CertificateManager;
 import com.aws.greengrass.componentmanager.KernelConfigResolver;
-import com.aws.greengrass.config.Topic;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.dependency.State;
-import com.aws.greengrass.device.ClientDevicesAuthService;
 import com.aws.greengrass.lifecyclemanager.GlobalStateChangeListener;
 import com.aws.greengrass.lifecyclemanager.GreengrassService;
 import com.aws.greengrass.lifecyclemanager.Kernel;
-import com.aws.greengrass.smbridge.auth.MQTTClientKeyStore;
-import com.aws.greengrass.smbridge.clients.MQTTClient;
-import com.aws.greengrass.mqttclient.MqttClient;
 import com.aws.greengrass.testcommons.testutilities.GGExtension;
 import com.aws.greengrass.testcommons.testutilities.GGServiceTestUtil;
 import com.aws.greengrass.util.Utils;
-import com.github.grantwest.eventually.EventuallyLambdaMatcher;
 import io.moquette.BrokerConstants;
 import io.moquette.broker.Server;
 import io.moquette.broker.config.IConfig;
@@ -32,43 +25,26 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, GGExtension.class})
-public class SMBridgeTest extends GGServiceTestUtil {
+public class StreamManagerBridgeServiceTest extends GGServiceTestUtil {
     private static final long TEST_TIME_OUT_SEC = 10L;
 
     private Kernel kernel;
     private GlobalStateChangeListener listener;
     private Server broker;
-    private ScheduledExecutorService ses;
 
     @TempDir
     Path rootDir;
@@ -84,7 +60,7 @@ public class SMBridgeTest extends GGServiceTestUtil {
         defaultConfig.setProperty(BrokerConstants.PORT_PROPERTY_NAME, "8883");
         broker = new Server();
         broker.startServer(defaultConfig);
-        ses = new ScheduledThreadPoolExecutor(1);
+        // ses = new ScheduledThreadPoolExecutor(1);
     }
 
     @AfterEach
@@ -98,7 +74,7 @@ public class SMBridgeTest extends GGServiceTestUtil {
         kernel.parseArgs("-r", rootDir.toAbsolutePath().toString(), "-i",
                 getClass().getResource(configFileName).toString());
         listener = (GreengrassService service, State was, State newState) -> {
-            if (service.getName().equals(SMBridge.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
+            if (service.getName().equals(StreamManagerBridgeService.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
                 bridgeRunning.countDown();
             }
         };
@@ -114,13 +90,13 @@ public class SMBridgeTest extends GGServiceTestUtil {
     }
 
     @Test
-    void GIVEN_Greengrass_with_sm_bridge_WHEN_valid_mqttTopicMapping_updated_THEN_mapping_updated() throws Exception {
+    void GIVEN_Greengrass_with_sm_bridge_WHEN_valid_mqttStreamMapping_updated_THEN_mapping_updated() throws Exception {
         startKernelWithConfig("config.yaml");
-        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((StreamManagerBridgeService) kernel.locate(StreamManagerBridgeService.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));
 
-        Topics mappingConfigTopics = kernel.locate(SMBridge.SERVICE_NAME).getConfig()
-                .lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, SMBridge.MQTT_STREAM_MAPPING);
+        Topics mappingConfigTopics = kernel.locate(StreamManagerBridgeService.SERVICE_NAME).getConfig()
+                .lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, StreamManagerBridgeService.MQTT_STREAM_MAPPING);
 
         mappingConfigTopics.replaceAndWait(Utils.immutableMap("m1",
                 Utils.immutableMap("topic", "mqtt/topic", "stream", "randomStream",

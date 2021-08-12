@@ -38,8 +38,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.inject.Inject;
 
-@ImplementsService(name = SMBridge.SERVICE_NAME)
-public class SMBridge extends PluginService {
+@ImplementsService(name = StreamManagerBridgeService.SERVICE_NAME)
+public class StreamManagerBridgeService extends PluginService {
     public static final String SERVICE_NAME = "aws.greengrass.StreamManagerBridge";
 
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
@@ -74,13 +74,13 @@ public class SMBridge extends PluginService {
      * @param mqttClientKeyStore KeyStore for MQTT Client
      */
     @Inject
-    public SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition, Kernel kernel,
+    public StreamManagerBridgeService(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition, Kernel kernel,
                     MQTTClientKeyStore mqttClientKeyStore, ExecutorService executorService) {
         this(topics, topicMapping, streamDefinition, new MessageBridge(topicMapping), kernel,
              mqttClientKeyStore, executorService);
     }
 
-    protected SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition,
+    protected StreamManagerBridgeService(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition,
                        MessageBridge messageBridge, Kernel kernel, MQTTClientKeyStore mqttClientKeyStore,
                        ExecutorService executorService) {
         super(topics);
