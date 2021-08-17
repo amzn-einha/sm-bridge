@@ -8,13 +8,24 @@ package com.aws.greengrass.smbridge;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.clients.MQTTClient;
+import com.aws.greengrass.smbridge.clients.SMClient;
+import com.aws.greengrass.smbridge.clients.SMClientException;
+import org.eclipse.paho.client.mqttv3.MqttTopic;
+import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Bridges/Routes the messages flowing from local MQTT to SM. This class process the topics mappings. It
@@ -25,6 +36,7 @@ public class MessageBridge {
 
     private final TopicMapping topicMapping;
     private MQTTClient mqttClient;
+    private SMClient smClient;
 
     // A map from a source topic to a Mapping Entry. The Entry specifies the output stream and the optional
     // append-values.
@@ -38,44 +50,65 @@ public class MessageBridge {
      * @param topicMapping topics mapping
      */
     public MessageBridge(TopicMapping topicMapping) {
-        this.mqttClient = null;
         this.topicMapping = topicMapping;
         this.topicMapping.listenToUpdates(this::processMapping);
         processMapping();
     }
 
-    private void handleMessage(Message message) {
+    private void handleMessage(MQTTMessage message) {
         String sourceTopic = message.getTopic();
         LOGGER.atDebug().kv("sourceTopic", sourceTopic).log("Message received");
 
         LOGGER.atDebug().kv("destinations", sourceDestinationMap).log("Message will be forwarded to destinations");
 
         if (sourceDestinationMap != null) {
-            List<TopicMapping.MappingEntry> destinations = sourceDestinationMap.get(sourceTopic);
-            if (destinations == null) {
-                return;
-            }
-            LOGGER.atDebug().log("HANDLING MESSAGE, NO IMPLEMENTED SM CLIENT");
-            /*
-            for (TopicMapping.MappingEntry destination : destinations) {
-                if (smClient != null) { // TODO: Add SM Client in Message Bridge
-                    Message msg = new Message(sourceTopic, message.getPayload());
-                    try {
-                        smClient.publish(msg);
-                        LOGGER.atDebug().kv("topic", sourceTopic).kv("stream", destination.getStream())
-                                .log("Published message");
-                    } catch (MessageClientException e) {
-                        LOGGER.atError().kv("topic", sourceTopic).kv("stream", destination.getStream())
-                                .log("Failed to publish");
-                    }
+            final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
+                String stream = destination.getStream();
+                StreamMessage streamMessage;
+                byte[] payload;
+                JSONObject jsonObject = new JSONObject();
+
+                if (destination.isAppendTime()){
+                    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
+                    LocalDateTime now = LocalDateTime.now();
+                    String stringTime = dtf.format(now);
+
+                    jsonObject.put("timestamp", stringTime);
                 }
-            }
-            */
+                if (destination.isAppendTopic()){
+                    jsonObject.put("topic", message.getTopic());
+                }
+                if (!jsonObject.isEmpty()) {
+                    byte[] jsonBytes = jsonObject.toString().getBytes();
+                    byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
+                    payload = new byte[2 + jsonBytes.length + message.getPayload().length];
+
+                    System.arraycopy(headerLengthInBytes, 0, payload, 0, 2);
+                    System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
+                    System.arraycopy(
+                            message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
+                } else {
+                    payload = message.getPayload();
+                }
+                streamMessage = new StreamMessage(stream, payload);
+                try {
+                    smClient.publish(streamMessage);
+                    LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
+                            .log("Published message");
+                } catch (SMClientException e) {
+                    LOGGER.atError().setCause(e).kv("Stream", stream).log("Stream Publish failed");
+                }
+            };
+            // Perform topic matching on filter
+            sourceDestinationMap.entrySet().stream().filter(
+                    mapping -> MqttTopic.isMatched(mapping.getKey(), sourceTopic))
+                    .map(Map.Entry::getValue)
+                    .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
         }
     }
 
     private void processMapping() {
-        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getMapping();
+        List<TopicMapping.MappingEntry> mappingEntryList = topicMapping.getList();
         LOGGER.atDebug().kv("topicMapping", mappingEntryList).log("Processing mapping");
 
         Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMapTemp = new HashMap<>();
@@ -88,6 +121,9 @@ public class MessageBridge {
 
         sourceDestinationMap = sourceDestinationMapTemp;
 
+        if (mqttClient != null) {
+            updateSubscriptionsForClient(mqttClient);
+        }
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 

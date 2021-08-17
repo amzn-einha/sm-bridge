@@ -261,7 +261,7 @@ public class MQTTClient {
                 try {
                     Thread.sleep(waitBeforeRetry * 1000);
                 } catch (InterruptedException er) {
-                    LOGGER.atError().setCause(er).log("Failed to ");
+                    LOGGER.atError().setCause(er).log("Failed to reconnect");
                     return;
                 }
                 waitBeforeRetry = Math.min(2 * waitBeforeRetry, MAX_WAIT_RETRY_IN_SECONDS);
