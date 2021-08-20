@@ -38,8 +38,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.inject.Inject;
 
-@ImplementsService(name = StreamManagerBridgeService.SERVICE_NAME)
-public class StreamManagerBridgeService extends PluginService {
+@ImplementsService(name = SMBridge.SERVICE_NAME)
+public class SMBridge extends PluginService {
     public static final String SERVICE_NAME = "aws.greengrass.StreamManagerBridge";
 
     @Getter(AccessLevel.PACKAGE) // Getter for unit tests
@@ -74,13 +74,13 @@ public class StreamManagerBridgeService extends PluginService {
      * @param mqttClientKeyStore KeyStore for MQTT Client
      */
     @Inject
-    public StreamManagerBridgeService(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition, Kernel kernel,
+    public SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition, Kernel kernel,
                     MQTTClientKeyStore mqttClientKeyStore, ExecutorService executorService) {
         this(topics, topicMapping, streamDefinition, new MessageBridge(topicMapping), kernel,
              mqttClientKeyStore, executorService);
     }
 
-    protected StreamManagerBridgeService(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition,
+    protected SMBridge(Topics topics, TopicMapping topicMapping, StreamDefinition streamDefinition,
                        MessageBridge messageBridge, Kernel kernel, MQTTClientKeyStore mqttClientKeyStore,
                        ExecutorService executorService) {
         super(topics);
@@ -176,9 +176,11 @@ public class StreamManagerBridgeService extends PluginService {
         }
 
         try {
+            logger.atInfo("Creating new MQTT Client @ SMBridge 179");
             if (mqttClient == null) {
                 mqttClient = new MQTTClient(this.config, mqttClientKeyStore, this.executorService);
             }
+            logger.atInfo("Starting MQTT Client @ SMBridge 183");
             mqttClient.start();
             messageBridge.addOrReplaceMqttClient(mqttClient);
         } catch (MQTTClientException e) {
@@ -187,14 +189,14 @@ public class StreamManagerBridgeService extends PluginService {
         }
 
         try {
+            logger.atInfo("Creating new SM Client @ SMBridge 192");
             smClient = new SMClient(this.config, streamDefinition);
+            logger.atInfo("Starting SM Client @ SMBridge 194");
             smClient.start();
             messageBridge.addOrReplaceSMClient(smClient);
         } catch (SMClientException e) {
-            // Commented out so that can test without failing w/o SM on Nucleus
-
-            //serviceErrored(e);
-            //return;
+            serviceErrored(e);
+            return;
         }
 
         reportState(State.RUNNING);

@@ -11,11 +11,14 @@ import com.amazonaws.greengrass.streammanager.client.config.StreamManagerClientC
 import com.amazonaws.greengrass.streammanager.client.config.StreamManagerServerInfo;
 import com.amazonaws.greengrass.streammanager.client.exception.StreamManagerException;
 import com.amazonaws.greengrass.streammanager.model.MessageStreamDefinition;
+import com.amazonaws.greengrass.streammanager.model.StrategyOnFull;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.StreamDefinition;
 import com.aws.greengrass.smbridge.StreamMessage;
+import lombok.AccessLevel;
+import lombok.Getter;
 import software.amazon.awssdk.aws.greengrass.GreengrassCoreIPCClient;
 import software.amazon.awssdk.aws.greengrass.model.GetConfigurationRequest;
 import software.amazon.awssdk.aws.greengrass.model.GetConfigurationResponse;
@@ -32,6 +35,7 @@ public class SMClient {
 
     private StreamManagerClient streamManagerClient;
     private StreamDefinition streamDefinition;
+    @Getter(AccessLevel.PACKAGE) // Let the unit test inspect this value
     private MessageStreamDefinition defaultStreamDefinition;
 
     /**
@@ -46,7 +50,8 @@ public class SMClient {
         this(topics, streamDefinition, null);
         // TODO: Handle the case when serverUri is modified
         try {
-            connectToStreamManagerWithCustomPort();
+            this.streamManagerClient = StreamManagerClientFactory.standard().build();
+            //connectToStreamManagerWithCustomPort();
         } catch (StreamManagerException e) {
             throw new SMClientException("Unable to create a SM client", e);
         }
@@ -104,6 +109,7 @@ public class SMClient {
             }
         }
         defaultStreamDefinition = new MessageStreamDefinition();
+        defaultStreamDefinition.setStrategyOnFull(StrategyOnFull.RejectNewData);
     }
 
     private MessageStreamDefinition findStreamDefinition(String streamName) {
@@ -138,16 +144,18 @@ public class SMClient {
                     );
                 }
                 streamManagerClient.createMessageStream(newStream);
+                LOGGER.atInfo().kv("Stream", message.getStream()).log("Created new stream");
             }
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).log("Unable to create stream");
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
             throw new SMClientException(e.getMessage(), e);
         }
 
         try {
             streamManagerClient.appendMessage(message.getStream(), message.getPayload());
+            LOGGER.atInfo().kv("Stream", message.getStream()).log("Appended message to stream");
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).log("Unable to append to stream");
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to append to stream");
             throw new SMClientException(e.getMessage(), e);
         }
     }

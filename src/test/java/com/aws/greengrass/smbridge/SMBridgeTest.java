@@ -39,11 +39,10 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 @ExtendWith({MockitoExtension.class, GGExtension.class})
-public class StreamManagerBridgeServiceTest extends GGServiceTestUtil {
+public class SMBridgeTest extends GGServiceTestUtil {
     private static final long TEST_TIME_OUT_SEC = 10L;
 
     private Kernel kernel;
-    private GlobalStateChangeListener listener;
     private Server broker;
 
     @TempDir
@@ -73,8 +72,8 @@ public class StreamManagerBridgeServiceTest extends GGServiceTestUtil {
         CountDownLatch bridgeRunning = new CountDownLatch(1);
         kernel.parseArgs("-r", rootDir.toAbsolutePath().toString(), "-i",
                 getClass().getResource(configFileName).toString());
-        listener = (GreengrassService service, State was, State newState) -> {
-            if (service.getName().equals(StreamManagerBridgeService.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
+        GlobalStateChangeListener listener = (GreengrassService service, State was, State newState) -> {
+            if (service.getName().equals(SMBridge.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
                 bridgeRunning.countDown();
             }
         };
@@ -92,11 +91,11 @@ public class StreamManagerBridgeServiceTest extends GGServiceTestUtil {
     @Test
     void GIVEN_Greengrass_with_sm_bridge_WHEN_valid_mqttStreamMapping_updated_THEN_mapping_updated() throws Exception {
         startKernelWithConfig("config.yaml");
-        TopicMapping topicMapping = ((StreamManagerBridgeService) kernel.locate(StreamManagerBridgeService.SERVICE_NAME)).getTopicMapping();
+        TopicMapping topicMapping = ((SMBridge) kernel.locate(SMBridge.SERVICE_NAME)).getTopicMapping();
         assertThat(topicMapping.getMapping().size(), is(equalTo(0)));
 
-        Topics mappingConfigTopics = kernel.locate(StreamManagerBridgeService.SERVICE_NAME).getConfig()
-                .lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, StreamManagerBridgeService.MQTT_STREAM_MAPPING);
+        Topics mappingConfigTopics = kernel.locate(SMBridge.SERVICE_NAME).getConfig()
+                .lookupTopics(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, SMBridge.MQTT_STREAM_MAPPING);
 
         mappingConfigTopics.replaceAndWait(Utils.immutableMap("m1",
                 Utils.immutableMap("topic", "mqtt/topic", "stream", "randomStream",

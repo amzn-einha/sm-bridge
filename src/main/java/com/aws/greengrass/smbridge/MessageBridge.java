@@ -98,6 +98,7 @@ public class MessageBridge {
         if (sourceDestinationMap != null) {
             final Consumer<TopicMapping.MappingEntry> processDestination = destination -> {
                 String stream = destination.getStream();
+                LOGGER.atDebug().kv("stream", stream).kv("topic", message.getTopic()).log("Forwarding message");
                 StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
                         destination.isAppendTime(), destination.isAppendTopic(), message));
                 try {
@@ -115,10 +116,10 @@ public class MessageBridge {
                     .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
 
             // Perform topic matching against reserved topic
-            if (MqttTopic.isMatched(StreamManagerBridgeService.RESERVED_TOPIC, sourceTopic)) {
+            if (MqttTopic.isMatched(SMBridge.RESERVED_TOPIC, sourceTopic)) {
                 String stream = sourceTopic.split("/")[1];
                 StreamMessage streamMessage = new StreamMessage(stream, preparePayload(
-                        StreamManagerBridgeService.APPEND_TIME_DEFAULT_STREAM, StreamManagerBridgeService.APPEND_TOPIC_DEFAULT_STREAM, message));
+                        SMBridge.APPEND_TIME_DEFAULT_STREAM, SMBridge.APPEND_TOPIC_DEFAULT_STREAM, message));
                 try {
                     smClient.publish(streamMessage);
                     LOGGER.atInfo().kv("Source Topic", message.getTopic()).kv("Destination Stream", stream)
@@ -157,7 +158,7 @@ public class MessageBridge {
         } else {
             topicsToSubscribe = new HashSet<>(sourceDestinationMap.keySet());
         }
-        topicsToSubscribe.add(StreamManagerBridgeService.RESERVED_TOPIC);
+        topicsToSubscribe.add(SMBridge.RESERVED_TOPIC);
 
         LOGGER.atDebug().kv("topics", topicsToSubscribe).log("Updating subscriptions");
 
