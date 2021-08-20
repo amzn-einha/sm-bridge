@@ -114,6 +114,7 @@ public class MessageBridge {
                     .map(Map.Entry::getValue)
                     .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
 
+            // TODO: Handle the case where reserved topic is already matched by a user-configured mapping
             // Perform topic matching against reserved topic
             if (MqttTopic.isMatched(SMBridge.RESERVED_TOPIC, sourceTopic)) {
                 String stream = sourceTopic.split("/")[1];
