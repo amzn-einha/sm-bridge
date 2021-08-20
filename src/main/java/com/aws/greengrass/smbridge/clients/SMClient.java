@@ -106,13 +106,13 @@ public class SMClient {
         defaultStreamDefinition = new MessageStreamDefinition();
     }
 
-    private MessageStreamDefinition findStreamDefinition(String streamName) {
+    private Optional<MessageStreamDefinition> findStreamDefinition(String streamName) {
         for (MessageStreamDefinition messageStreamDefinition : streamDefinition.getList()) {
             if (messageStreamDefinition.getName() == streamName) {
-                return messageStreamDefinition;
+                return Optional.of(messageStreamDefinition);
             }
         }
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -124,9 +124,9 @@ public class SMClient {
     public void publish(StreamMessage message) throws SMClientException {
         try {
             if (!checkStreamExists(message.getStream())) {
-                MessageStreamDefinition newStream = findStreamDefinition(message.getStream());
-                if (newStream == null) {
-                    newStream = new MessageStreamDefinition(
+                Optional<MessageStreamDefinition> newStream = findStreamDefinition(message.getStream());
+                if (!newStream.isPresent()) {
+                    newStream = Optional.of(new MessageStreamDefinition(
                             message.getStream(),
                             defaultStreamDefinition.getMaxSize(),
                             defaultStreamDefinition.getStreamSegmentSize(),
@@ -135,9 +135,9 @@ public class SMClient {
                             defaultStreamDefinition.getPersistence(),
                             defaultStreamDefinition.getFlushOnWrite(),
                             defaultStreamDefinition.getExportDefinition()
-                    );
+                    ));
                 }
-                streamManagerClient.createMessageStream(newStream);
+                streamManagerClient.createMessageStream(newStream.get());
             }
         } catch (StreamManagerException e) {
             LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
