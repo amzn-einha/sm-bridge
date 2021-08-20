@@ -140,14 +140,14 @@ public class SMClient {
                 streamManagerClient.createMessageStream(newStream);
             }
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).log("Unable to create stream");
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
             throw new SMClientException(e.getMessage(), e);
         }
 
         try {
             streamManagerClient.appendMessage(message.getStream(), message.getPayload());
         } catch (StreamManagerException e) {
-            LOGGER.atWarn().kv("Stream", message.getStream()).log("Unable to append to stream");
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to append to stream");
             throw new SMClientException(e.getMessage(), e);
         }
     }
