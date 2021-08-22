@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.inject.Inject;
 
 @ImplementsService(name = SMBridge.SERVICE_NAME)
@@ -56,6 +57,7 @@ public class SMBridge extends PluginService {
             JsonMapper.builder().enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES).build();
     static final String MQTT_STREAM_MAPPING = "mqttStreamMapping";
     static final String STREAM_DEFINITION = "streamDefinition";
+    static final String STREAM_MANAGER_PORT_KEY = "STREAM_MANAGER_SERVER_PORT";
     static final String RESERVED_TOPIC = "$SM-BRIDGE/+/#";
     static boolean SINGLE_DEFAULT_STREAM = true;
     static boolean APPEND_TIME_DEFAULT_STREAM = true;
@@ -176,22 +178,31 @@ public class SMBridge extends PluginService {
         }
 
         try {
-            logger.atInfo("Creating new MQTT Client @ SMBridge 179");
             if (mqttClient == null) {
                 mqttClient = new MQTTClient(this.config, mqttClientKeyStore, this.executorService);
             }
-            logger.atInfo("Starting MQTT Client @ SMBridge 183");
             mqttClient.start();
             messageBridge.addOrReplaceMqttClient(mqttClient);
         } catch (MQTTClientException e) {
             serviceErrored(e);
             return;
         }
+        AtomicInteger port = new AtomicInteger(8088);
+        try {
+            kernel.locate("aws.greengrass.StreamManager").getConfig()
+                    .lookup(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, "port").subscribe((why, newv) -> {
+                        String topic = (String) newv.toPOJO();
+                        port.set(Integer.parseInt(topic));
+                    });
+        } catch (ServiceLoadException e) {
+            logger.atError().cause(e).log("Unable to locate {} service while subscribing to custom SM port",
+                    "aws.greengrass.StreamManager");
+            serviceErrored(e);
+            return;
+        }
 
         try {
-            logger.atInfo("Creating new SM Client @ SMBridge 192");
-            smClient = new SMClient(this.config, streamDefinition);
-            logger.atInfo("Starting SM Client @ SMBridge 194");
+            smClient = new SMClient(this.config, port.intValue(), streamDefinition);
             smClient.start();
             messageBridge.addOrReplaceSMClient(smClient);
         } catch (SMClientException e) {

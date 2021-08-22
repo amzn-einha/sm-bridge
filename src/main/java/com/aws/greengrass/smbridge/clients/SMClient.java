@@ -19,15 +19,8 @@ import com.aws.greengrass.smbridge.StreamDefinition;
 import com.aws.greengrass.smbridge.StreamMessage;
 import lombok.AccessLevel;
 import lombok.Getter;
-import software.amazon.awssdk.aws.greengrass.GreengrassCoreIPCClient;
-import software.amazon.awssdk.aws.greengrass.model.GetConfigurationRequest;
-import software.amazon.awssdk.aws.greengrass.model.GetConfigurationResponse;
-import software.amazon.awssdk.eventstreamrpc.EventStreamRPCConnection;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import javax.inject.Inject;
 
 public class SMClient {
@@ -42,59 +35,27 @@ public class SMClient {
      * Ctr for SMClient.
      *
      * @param  topics            topics passed in by Nucleus
+     * @param  port              custom port as parsed from kernel config
      * @param  streamDefinition  stream configs as parsed by SMBridge class
      * @throws SMClientException if unable to create SM Client
      */
     @Inject
-    public SMClient(Topics topics, StreamDefinition streamDefinition) throws SMClientException {
+    public SMClient(Topics topics, int port, StreamDefinition streamDefinition) throws SMClientException {
         this(topics, streamDefinition, null);
-        // TODO: Handle the case when serverUri is modified
         try {
-            this.streamManagerClient = StreamManagerClientFactory.standard().build();
-            //connectToStreamManagerWithCustomPort();
+            final StreamManagerClientConfig config = StreamManagerClientConfig.builder()
+                    .serverInfo(StreamManagerServerInfo.builder().port(port).build()).build();
+            this.streamManagerClient = StreamManagerClientFactory.standard().withClientConfig(config).build();
         } catch (StreamManagerException e) {
             throw new SMClientException("Unable to create a SM client", e);
         }
+        LOGGER.atInfo().kv("port", port).log("Created new Stream Manager client");
     }
 
     @SuppressWarnings("PMD.UnusedFormalParameter") // topics may be needed later for extensibility with kernel interact
     protected SMClient(Topics topics, StreamDefinition streamDefinition, StreamManagerClient streamManagerClient) {
         this.streamManagerClient = streamManagerClient;
         this.streamDefinition = streamDefinition;
-    }
-
-    @SuppressWarnings("PMD.CloseResource") // The socket is closed with a .disconnect() that pmd doesn't parse
-    void connectToStreamManagerWithCustomPort() throws StreamManagerException {
-        EventStreamRPCConnection eventStreamRpcConnection = null;
-        try {
-            eventStreamRpcConnection = IPCUtils.getEventStreamRpcConnection();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.atError("Unable to create an RPC connection from IPCUtils");
-            throw new StreamManagerException("RPC/IPC Exception", e);
-        }
-        GreengrassCoreIPCClient greengrassCoreIPCClient = new GreengrassCoreIPCClient(eventStreamRpcConnection);
-        List<String> keyPath = new ArrayList<>();
-        keyPath.add("port");
-
-        GetConfigurationRequest request = new GetConfigurationRequest();
-        request.setComponentName("aws.greengrass.smbridge");
-        request.setKeyPath(keyPath);
-        GetConfigurationResponse response = null;
-        try {
-            response = greengrassCoreIPCClient.getConfiguration(request, Optional.empty()).getResponse().get();
-        } catch (InterruptedException | ExecutionException e) {
-            eventStreamRpcConnection.disconnect();
-            LOGGER.atError("Unable to get configuration from IPC client");
-            throw new StreamManagerException("IPC Client Exception", e);
-        }
-        eventStreamRpcConnection.disconnect();
-        String port = response.getValue().get("port").toString();
-        LOGGER.atInfo("Stream Manager is running on port: " + port);
-
-        final StreamManagerClientConfig config = StreamManagerClientConfig.builder()
-                .serverInfo(StreamManagerServerInfo.builder().port(Integer.parseInt(port)).build()).build();
-
-        this.streamManagerClient = StreamManagerClientFactory.standard().withClientConfig(config).build();
     }
 
     /**
@@ -104,7 +65,7 @@ public class SMClient {
         for (String key : streamDefinition.getStreams().keySet()) {
             if ("default".equalsIgnoreCase(key)) {
                 defaultStreamDefinition = streamDefinition.getStreams().get(key);
-                LOGGER.atInfo("Set default stream configuration");
+                LOGGER.atDebug("Set default stream configuration");
                 return;
             }
         }
@@ -112,27 +73,27 @@ public class SMClient {
         defaultStreamDefinition.setStrategyOnFull(StrategyOnFull.RejectNewData);
     }
 
-    private MessageStreamDefinition findStreamDefinition(String streamName) {
+    private Optional<MessageStreamDefinition> findStreamDefinition(String streamName) {
         for (MessageStreamDefinition messageStreamDefinition : streamDefinition.getList()) {
             if (messageStreamDefinition.getName() == streamName) {
-                return messageStreamDefinition;
+                return Optional.of(messageStreamDefinition);
             }
         }
-        return null;
+        return Optional.empty();
     }
 
     /**
      * Called by the Message Bridge message handler to publish a message to a given stream.
      *
-     * @param message             encapsulates a stream name and byte-wise payload
+     * @param  message            encapsulates a stream name and byte-wise payload
      * @throws SMClientException  thrown if encounters an error at any point
      */
     public void publish(StreamMessage message) throws SMClientException {
         try {
             if (!checkStreamExists(message.getStream())) {
-                MessageStreamDefinition newStream = findStreamDefinition(message.getStream());
-                if (newStream == null) {
-                    newStream = new MessageStreamDefinition(
+                Optional<MessageStreamDefinition> newStream = findStreamDefinition(message.getStream());
+                if (!newStream.isPresent()) {
+                    newStream = Optional.of(new MessageStreamDefinition(
                             message.getStream(),
                             defaultStreamDefinition.getMaxSize(),
                             defaultStreamDefinition.getStreamSegmentSize(),
@@ -141,9 +102,9 @@ public class SMClient {
                             defaultStreamDefinition.getPersistence(),
                             defaultStreamDefinition.getFlushOnWrite(),
                             defaultStreamDefinition.getExportDefinition()
-                    );
+                    ));
                 }
-                streamManagerClient.createMessageStream(newStream);
+                streamManagerClient.createMessageStream(newStream.get());
                 LOGGER.atInfo().kv("Stream", message.getStream()).log("Created new stream");
             }
         } catch (StreamManagerException e) {
