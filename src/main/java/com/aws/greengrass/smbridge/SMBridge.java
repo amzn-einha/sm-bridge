@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.inject.Inject;
 
 @ImplementsService(name = SMBridge.SERVICE_NAME)
@@ -185,16 +186,27 @@ public class SMBridge extends PluginService {
             serviceErrored(e);
             return;
         }
+        AtomicInteger port = new AtomicInteger(8088);
+        try {
+            kernel.locate("aws.greengrass.StreamManager").getConfig()
+                    .lookup(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, "port").subscribe((why, newv) -> {
+                        String topic = (String) newv.toPOJO();
+                        port.set(Integer.parseInt(topic));
+                    });
+        } catch (ServiceLoadException e) {
+            logger.atError().cause(e).log("Unable to locate {} service while subscribing to custom SM port",
+                    "aws.greengrass.StreamManager");
+            serviceErrored(e);
+            return;
+        }
 
         try {
-            smClient = new SMClient(this.config, streamDefinition);
+            smClient = new SMClient(this.config, port.intValue(), streamDefinition);
             smClient.start();
             messageBridge.addOrReplaceSMClient(smClient);
         } catch (SMClientException e) {
-            // Commented out so that can test without failing w/o SM on Nucleus
-
-            //serviceErrored(e);
-            //return;
+            serviceErrored(e);
+            return;
         }
 
         reportState(State.RUNNING);
