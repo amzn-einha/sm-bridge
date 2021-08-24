@@ -5,6 +5,7 @@
 
 package com.aws.greengrass.smbridge;
 
+import com.amazonaws.greengrass.streammanager.model.S3ExportTaskDefinition;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -53,6 +54,19 @@ public class TopicMapping {
         @Getter
         @JsonProperty("appendTopic")
         private boolean appendTopic = false;
+        @Getter
+        @JsonProperty("s3Export")
+        private S3Export s3Export;
+        @Getter
+        @JsonProperty("siteWisePropertyAlias")
+        private String siteWisePropertyAlias;
+
+        public MappingEntry(String topic, String stream, boolean appendTime, boolean appendTopic) {
+            this.topic = topic;
+            this.stream = stream;
+            this.appendTime = appendTime;
+            this.appendTopic = appendTopic;
+        }
 
         @Override
         public String toString() {
@@ -61,6 +75,19 @@ public class TopicMapping {
                     topic, stream, appendTime, appendTopic
             );
         }
+
+        @AllArgsConstructor
+        @NoArgsConstructor
+        @EqualsAndHashCode
+        public static class S3Export {
+            @Getter
+            @JsonProperty("s3Bucket")
+            private String s3Bucket;
+            @Getter
+            @JsonProperty("s3Key")
+            private String s3key;
+        }
+
     }
 
     @FunctionalInterface
