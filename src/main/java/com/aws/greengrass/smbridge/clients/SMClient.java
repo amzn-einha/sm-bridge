@@ -21,13 +21,14 @@ import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 
 public class SMClient {
     private static final Logger LOGGER = LogManager.getLogger(SMClient.class);
 
     private StreamManagerClient streamManagerClient;
-    private StreamDefinition streamDefinition;
+    private AtomicReference<StreamDefinition> streamDefinition = new AtomicReference<>();
     @Getter(AccessLevel.PACKAGE) // Let the unit test inspect this value
     private MessageStreamDefinition defaultStreamDefinition;
 
@@ -55,16 +56,16 @@ public class SMClient {
     @SuppressWarnings("PMD.UnusedFormalParameter") // topics may be needed later for extensibility with kernel interact
     protected SMClient(Topics topics, StreamDefinition streamDefinition, StreamManagerClient streamManagerClient) {
         this.streamManagerClient = streamManagerClient;
-        this.streamDefinition = streamDefinition;
+        this.streamDefinition.set(streamDefinition);
     }
 
     /**
      *  Called after instantiation to set the default stream configuration.
      */
     public void start() {
-        for (String key : streamDefinition.getStreams().keySet()) {
+        for (String key : streamDefinition.get().getStreams().keySet()) {
             if ("default".equalsIgnoreCase(key)) {
-                defaultStreamDefinition = streamDefinition.getStreams().get(key);
+                defaultStreamDefinition = streamDefinition.get().getStreams().get(key);
                 LOGGER.atDebug("Set default stream configuration");
                 return;
             }
@@ -74,7 +75,7 @@ public class SMClient {
     }
 
     private Optional<MessageStreamDefinition> findStreamDefinition(String streamName) {
-        for (MessageStreamDefinition messageStreamDefinition : streamDefinition.getList()) {
+        for (MessageStreamDefinition messageStreamDefinition : streamDefinition.get().getList()) {
             if (messageStreamDefinition.getName() == streamName) {
                 return Optional.of(messageStreamDefinition);
             }
@@ -109,6 +110,7 @@ public class SMClient {
             }
         } catch (StreamManagerException e) {
             LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
+            // TODO: Retry
             throw new SMClientException(e.getMessage(), e);
         }
 
@@ -117,6 +119,7 @@ public class SMClient {
             LOGGER.atInfo().kv("Stream", message.getStream()).log("Appended message to stream");
         } catch (StreamManagerException e) {
             LOGGER.atError().kv("Stream", message.getStream()).log("Unable to append to stream");
+            // TODO: Retry
             throw new SMClientException(e.getMessage(), e);
         }
     }

@@ -11,16 +11,15 @@ import com.aws.greengrass.smbridge.clients.MQTTClient;
 import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
-import org.json.JSONObject;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -38,7 +37,8 @@ public class MessageBridge {
     // append-values.
     // Example:
     // "/sourceTopic1" -> [{"/sourceTopic1", "outputStream1", false, true}]
-    private Map<String, List<TopicMapping.MappingEntry>> sourceDestinationMap = new HashMap<>();
+    private AtomicReference<Map<String, List<TopicMapping.MappingEntry>>> sourceDestinationMap =
+            new AtomicReference<>(new HashMap<>());
 
     /**
      * Ctr for Message Bridge.
@@ -62,20 +62,18 @@ public class MessageBridge {
 
     private byte[] preparePayload(boolean appendTime, boolean appendTopic, MQTTMessage message) {
         byte[] payload;
-        JSONObject jsonObject = new JSONObject();
-
+        Metadata metadata = new Metadata();
         if (appendTime) {
-            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss.SSSSSS");
             LocalDateTime now = LocalDateTime.now();
-            String stringTime = dtf.format(now);
-
-            jsonObject.put("timestamp", stringTime);
+            metadata.setTimestamp(now);
         }
         if (appendTopic) {
-            jsonObject.put("topic", message.getTopic());
+            metadata.setTopic(message.getTopic());
         }
-        if (!jsonObject.isEmpty()) {
-            byte[] jsonBytes = jsonObject.toString().getBytes();
+        if (metadata.isEmpty()) {
+            payload = message.getPayload();
+        } else {
+            byte[] jsonBytes = metadata.toString().getBytes();
             byte[] headerLengthInBytes = {(byte) (jsonBytes.length >> 8), (byte) jsonBytes.length};
             payload = new byte[2 + jsonBytes.length + message.getPayload().length];
 
@@ -83,8 +81,6 @@ public class MessageBridge {
             System.arraycopy(jsonBytes, 0, payload, 2, jsonBytes.length);
             System.arraycopy(
                     message.getPayload(), 0, payload, 2 + jsonBytes.length, message.getPayload().length);
-        } else {
-            payload = message.getPayload();
         }
         return payload;
     }
@@ -110,7 +106,7 @@ public class MessageBridge {
                 }
             };
             // Perform topic matching on filter from mapped topics/destinations
-            sourceDestinationMap.entrySet().stream().filter(
+            sourceDestinationMap.get().entrySet().stream().filter(
                     mapping -> MqttTopic.isMatched(mapping.getKey(), sourceTopic))
                     .map(Map.Entry::getValue)
                     .forEach(perTopicMapping -> perTopicMapping.forEach(processDestination));
@@ -144,7 +140,7 @@ public class MessageBridge {
                     .add(mappingEntry);
         });
 
-        sourceDestinationMap = sourceDestinationMapTemp;
+        sourceDestinationMap.set(sourceDestinationMapTemp);
 
         if (mqttClient != null) {
             updateSubscriptionsForClient(mqttClient);
@@ -157,7 +153,7 @@ public class MessageBridge {
         if (sourceDestinationMap == null) {
             topicsToSubscribe = new HashSet<>();
         } else {
-            topicsToSubscribe = new HashSet<>(sourceDestinationMap.keySet());
+            topicsToSubscribe = new HashSet<>(sourceDestinationMap.get().keySet());
         }
         topicsToSubscribe.add(SMBridge.RESERVED_TOPIC);
 
