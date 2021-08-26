@@ -1,8 +1,0 @@
-services:
-    aws.greengrass.smbridge:
-        configuration:
-            brokerServerUri: 'tcp://localhost:8883'
-    main:
-        dependencies:
-            - aws.greengrass.smbridge
-           # - aws.greengrass.StreamManager
