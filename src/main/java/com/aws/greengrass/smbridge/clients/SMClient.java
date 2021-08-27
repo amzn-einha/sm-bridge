@@ -5,24 +5,22 @@
 
 package com.aws.greengrass.smbridge.clients;
 
-import com.amazonaws.greengrass.streammanager.client.StreamManagerClient;
 import com.amazonaws.greengrass.streammanager.client.StreamManagerClientFactory;
-import com.amazonaws.greengrass.streammanager.client.config.StreamManagerClientConfig;
-import com.amazonaws.greengrass.streammanager.client.config.StreamManagerServerInfo;
 import com.amazonaws.greengrass.streammanager.client.exception.StreamManagerException;
 import com.amazonaws.greengrass.streammanager.model.MessageStreamDefinition;
 import com.amazonaws.greengrass.streammanager.model.StrategyOnFull;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
-import com.aws.greengrass.smbridge.StreamDefinition;
 import com.aws.greengrass.smbridge.StreamMessage;
 import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+
 import javax.inject.Inject;
+import java.util.List;
 
 public class SMClient {
     private static final Logger LOGGER = LogManager.getLogger(SMClient.class);
@@ -126,11 +124,31 @@ public class SMClient {
 
     private boolean checkStreamExists(String stream) {
         try {
-            // Return type: MessageStreamInfo
-            streamManagerClient.describeMessageStream(stream);
+            MessageStreamInfo msi = smClient.describeMessageStream(stream);
+            return true;
         } catch (StreamManagerException e) {
             return false;
         }
-        return true;
+    }
+
+    private void updateStream(MessageStreamDefinition msd) throws StreamManagerException {
+        MessageStreamInfo messageStreamInfo;
+        messageStreamInfo = smClient.describeMessageStream(msd.getName());
+
+        smClient.updateMessageStream(
+                messageStreamInfo.getDefinition()
+                        .withMaxSize(msd.getMaxSize())
+                        .withStreamSegmentSize(msd.getStreamSegmentSize())
+                        .withTimeToLiveMillis(msd.getTimeToLiveMillis())
+                        .withStrategyOnFull(msd.getStrategyOnFull())
+                        .withPersistence(msd.getPersistence())
+                        .withFlushOnWrite(msd.getFlushOnWrite())
+                        .withExportDefinition(null)
+
+        );
+    }
+
+    private void createStream(MessageStreamDefinition msd) throws StreamManagerException {
+        smClient.createMessageStream(msd);
     }
 }
