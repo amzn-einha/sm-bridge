@@ -12,7 +12,7 @@
     <artifactId>sm-bridge</artifactId>
     <name>greengrass-sm-bridge</name>
     <packaging>jar</packaging>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <licenses>
         <license>
@@ -37,6 +37,11 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
+        <repository>
+            <id>local-sdk</id>
+            <name>Local SDKs</name>
+            <url>file://${project.basedir}/lib</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -51,6 +56,11 @@
             <artifactId>nucleus</artifactId>
             <version>2.2.0-SNAPSHOT</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.aws.greengrass</groupId>
+            <artifactId>stream-manager-sdk</artifactId>
+            <version>1.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.paho</groupId>
@@ -72,7 +82,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.10</version>
+            <version>1.18.20</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -95,6 +105,18 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
             <version>2.11.2</version>
+        </dependency>
+        <!-- CBOR dependency adds 1.5MB to jar size. Need another method to bring this in? -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-cbor</artifactId>
+            <version>2.12.3</version>
+        </dependency>
+        <!-- required for SM SDK -->
+        <dependency>
+            <groupId>javax.validation</groupId>
+            <artifactId>validation-api</artifactId>
+            <version>2.0.1.Final</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -131,13 +153,6 @@
             <artifactId>hamcrest-eventually-matchers</artifactId>
             <version>0.0.3</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws.greengrass</groupId>
-            <artifactId>streammanager</artifactId>
-            <version>1.1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/aws-greengrass-stream-manager-sdk-java-slim.jar</systemPath>
         </dependency>
     </dependencies>
     <build>
@@ -313,6 +328,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <skip>${skipTests}</skip>
                             <dataFile>${project.build.directory}/jacoco.exec</dataFile>
                             <rules>
                                 <rule>
@@ -346,10 +362,14 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>${mqttbridgejar.name}</finalName>
+                            <finalName>${smbridgejar.name}</finalName>
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>lib/com/aws/greengrass/stream-manager-sdk/1.1.0/stream-manager-sdk-1.1.0.jar</resource>
+                                    <file>lib/com/aws/greengrass/stream-manager-sdk/1.1.0/stream-manager-sdk-1.1.0.jar</file>
+                                </transformer>
                             </transformers>
                             <filters>
                                 <filter>
@@ -377,7 +397,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <skipTests>false</skipTests>
         <groups></groups>
-        <smbridgejar.name>aws.greengrass.clientdevices.sm.bridge</smbridgejar.name>
+        <smbridgejar.name>aws.greengrass.StreamManagerBridge</smbridgejar.name>
     </properties>
     <distributionManagement>
         <snapshotRepository>
