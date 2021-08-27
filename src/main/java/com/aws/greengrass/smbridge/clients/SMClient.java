@@ -8,16 +8,16 @@ package com.aws.greengrass.smbridge.clients;
 import com.amazonaws.greengrass.streammanager.client.StreamManagerClientFactory;
 import com.amazonaws.greengrass.streammanager.client.exception.StreamManagerException;
 import com.amazonaws.greengrass.streammanager.model.MessageStreamDefinition;
-import com.amazonaws.greengrass.streammanager.model.MessageStreamInfo;
 import com.amazonaws.greengrass.streammanager.model.StrategyOnFull;
-import com.amazonaws.greengrass.streammanager.model.export.ExportDefinition;
-import com.aws.greengrass.componentmanager.KernelConfigResolver;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
 import com.aws.greengrass.smbridge.StreamMessage;
-import com.aws.greengrass.smbridge.StreamDefinition;
-import com.amazonaws.greengrass.streammanager.client.StreamManagerClient;
+import lombok.AccessLevel;
+import lombok.Getter;
+
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -25,79 +25,100 @@ import java.util.List;
 public class SMClient {
     private static final Logger LOGGER = LogManager.getLogger(SMClient.class);
 
-    private StreamManagerClient smClient;
-    // The default stream receives all messages on reserved topics that have not been configured
-    // to go to another user-configured stream.
-    private MessageStreamDefinition defaultStream;
-    // TODO: Configurable MessageStreamDefinition for default settings of a specified but not-yet-created stream
+    private StreamManagerClient streamManagerClient;
+    private AtomicReference<StreamDefinition> streamDefinition = new AtomicReference<>();
+    @Getter(AccessLevel.PACKAGE) // Let the unit test inspect this value
+    private MessageStreamDefinition defaultStreamDefinition;
+
     /**
      * Ctr for SMClient.
      *
-     * @param topics             topics passed in by Nucleus
+     * @param  topics            topics passed in by Nucleus
+     * @param  port              custom port as parsed from kernel config
+     * @param  streamDefinition  stream configs as parsed by SMBridge class
      * @throws SMClientException if unable to create SM Client
      */
     @Inject
-    public SMClient(Topics topics) throws SMClientException {
-        this(topics, null);
+    public SMClient(Topics topics, int port, StreamDefinition streamDefinition) throws SMClientException {
+        this(topics, streamDefinition, null);
         try {
-            // TODO: Discover non-default SM port
-            //  https://docs.aws.amazon.com/greengrass/v2/developerguide/use-stream-manager-in-custom-components.html
-            this.smClient = StreamManagerClientFactory.standard().build();
+            final StreamManagerClientConfig config = StreamManagerClientConfig.builder()
+                    .serverInfo(StreamManagerServerInfo.builder().port(port).build()).build();
+            this.streamManagerClient = StreamManagerClientFactory.standard().withClientConfig(config).build();
         } catch (StreamManagerException e) {
             throw new SMClientException("Unable to create a SM client", e);
         }
-    }
-    protected SMClient(Topics topics, StreamManagerClient streamManagerClient){
-        this.smClient = streamManagerClient;
-        // TODO: Configurable default stream
-        this.defaultStream = new MessageStreamDefinition();
-        this.defaultStream.setName("mqttToStreamDefaultStreamName");
-        this.defaultStream.setTimeToLiveMillis(9223372036854L);
-        this.defaultStream.setStrategyOnFull(StrategyOnFull.RejectNewData);
+        LOGGER.atInfo().kv("port", port).log("Created new Stream Manager client");
     }
 
-    public void start() throws SMClientException {
-        try {
-            updateOrCreateStream(defaultStream);
-        } catch (StreamManagerException e) {
-            LOGGER.atError().log("Failed to create or update the default stream", e);
+    @SuppressWarnings("PMD.UnusedFormalParameter") // topics may be needed later for extensibility with kernel interact
+    protected SMClient(Topics topics, StreamDefinition streamDefinition, StreamManagerClient streamManagerClient) {
+        this.streamManagerClient = streamManagerClient;
+        this.streamDefinition.set(streamDefinition);
+    }
+
+    /**
+     *  Called after instantiation to set the default stream configuration.
+     */
+    public void start() {
+        for (String key : streamDefinition.get().getStreams().keySet()) {
+            if ("default".equalsIgnoreCase(key)) {
+                defaultStreamDefinition = streamDefinition.get().getStreams().get(key);
+                LOGGER.atDebug("Set default stream configuration");
+                return;
+            }
         }
+        defaultStreamDefinition = new MessageStreamDefinition();
+        defaultStreamDefinition.setStrategyOnFull(StrategyOnFull.RejectNewData);
     }
 
-    public void publishOnDefaultStream(byte[] payload) throws SMClientException{
-        // TODO: Configurable default stream name
-        publish(new StreamMessage(defaultStream.getName(), payload));
+    private Optional<MessageStreamDefinition> findStreamDefinition(String streamName) {
+        for (MessageStreamDefinition messageStreamDefinition : streamDefinition.get().getList()) {
+            if (messageStreamDefinition.getName() == streamName) {
+                return Optional.of(messageStreamDefinition);
+            }
+        }
+        return Optional.empty();
     }
 
-    public void publish(StreamMessage message) throws SMClientException{
+    /**
+     * Called by the Message Bridge message handler to publish a message to a given stream.
+     *
+     * @param  message            encapsulates a stream name and byte-wise payload
+     * @throws SMClientException  thrown if encounters an error at any point
+     */
+    public void publish(StreamMessage message) throws SMClientException {
         try {
             if (!checkStreamExists(message.getStream())) {
-                // TODO: see todo about about configuring specified but uninstantiated streams
-                MessageStreamDefinition newStream = new MessageStreamDefinition();
-                newStream.setName(message.getStream());
-                newStream.setTimeToLiveMillis(9223372036854L);
-                newStream.setStrategyOnFull(StrategyOnFull.RejectNewData);
-                createStream(newStream);
+                Optional<MessageStreamDefinition> newStream = findStreamDefinition(message.getStream());
+                if (!newStream.isPresent()) {
+                    newStream = Optional.of(new MessageStreamDefinition(
+                            message.getStream(),
+                            defaultStreamDefinition.getMaxSize(),
+                            defaultStreamDefinition.getStreamSegmentSize(),
+                            defaultStreamDefinition.getTimeToLiveMillis(),
+                            defaultStreamDefinition.getStrategyOnFull(),
+                            defaultStreamDefinition.getPersistence(),
+                            defaultStreamDefinition.getFlushOnWrite(),
+                            defaultStreamDefinition.getExportDefinition()
+                    ));
+                }
+                streamManagerClient.createMessageStream(newStream.get());
                 LOGGER.atInfo().kv("Stream", message.getStream()).log("Created new stream");
             }
         } catch (StreamManagerException e) {
-            LOGGER.atError().kv("Stream", message.getStream()).setCause(e).log("Unable to create stream");
-            return;
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
+            // TODO: Retry
+            throw new SMClientException(e.getMessage(), e);
         }
 
         try {
-            long sequenceNumber = smClient.appendMessage(message.getStream(), message.getPayload());
-            LOGGER.atInfo().kv("Stream", message.getStream()).log("Appended message to string");
+            streamManagerClient.appendMessage(message.getStream(), message.getPayload());
+            LOGGER.atInfo().kv("Stream", message.getStream()).log("Appended message to stream");
         } catch (StreamManagerException e) {
-            LOGGER.atError().kv("Stream", message.getStream()).setCause(e).log("Unable to append to stream");
-        }
-    }
-
-    private void updateOrCreateStream(MessageStreamDefinition msd) throws StreamManagerException {
-        if (checkStreamExists(msd.getName())){
-            updateStream(msd);
-        } else {
-            createStream(msd);
+            LOGGER.atError().kv("Stream", message.getStream()).log("Unable to append to stream");
+            // TODO: Retry
+            throw new SMClientException(e.getMessage(), e);
         }
     }
 

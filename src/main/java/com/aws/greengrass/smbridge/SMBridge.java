@@ -28,6 +28,9 @@ import java.io.IOException;
 import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.inject.Inject;
 
 @ImplementsService(name = SMBridge.SERVICE_NAME)
@@ -41,6 +44,14 @@ public class SMBridge extends PluginService {
     private final MQTTClientKeyStore mqttClientKeyStore;
     private MQTTClient mqttClient;
     static final String MQTT_STREAM_MAPPING = "mqttStreamMapping";
+    static final String STREAM_DEFINITION = "streamDefinition";
+    static final String STREAM_MANAGER_PORT_KEY = "STREAM_MANAGER_SERVER_PORT";
+    static final String RESERVED_TOPIC = "$SM-BRIDGE/+/#";
+    static boolean SINGLE_DEFAULT_STREAM = true;
+    static boolean APPEND_TIME_DEFAULT_STREAM = true;
+    static boolean APPEND_TOPIC_DEFAULT_STREAM = true;
+    private Topics mappingConfigTopics;
+    private Topics streamsConfigTopics;
 
     /**
      * Ctr for MQTTBridge.
@@ -127,6 +138,29 @@ public class SMBridge extends PluginService {
             serviceErrored(e);
             return;
         }
+        AtomicInteger port = new AtomicInteger(8088);
+        try {
+            kernel.locate("aws.greengrass.StreamManager").getConfig()
+                    .lookup(KernelConfigResolver.CONFIGURATION_CONFIG_KEY, "port").subscribe((why, newv) -> {
+                        String topic = (String) newv.toPOJO();
+                        port.set(Integer.parseInt(topic));
+                    });
+        } catch (ServiceLoadException e) {
+            logger.atError().cause(e).log("Unable to locate {} service while subscribing to custom SM port",
+                    "aws.greengrass.StreamManager");
+            serviceErrored(e);
+            return;
+        }
+
+        try {
+            smClient = new SMClient(this.config, port.intValue(), streamDefinition);
+            smClient.start();
+            messageBridge.addOrReplaceSMClient(smClient);
+        } catch (SMClientException e) {
+            serviceErrored(e);
+            return;
+        }
+
         reportState(State.RUNNING);
     }
 

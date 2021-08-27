@@ -43,7 +43,6 @@ public class SMBridgeTest extends GGServiceTestUtil {
     private static final long TEST_TIME_OUT_SEC = 10L;
 
     private Kernel kernel;
-    private GlobalStateChangeListener listener;
     private Server broker;
 
     @TempDir
@@ -73,7 +72,7 @@ public class SMBridgeTest extends GGServiceTestUtil {
         CountDownLatch bridgeRunning = new CountDownLatch(1);
         kernel.parseArgs("-r", rootDir.toAbsolutePath().toString(), "-i",
                 getClass().getResource(configFileName).toString());
-        listener = (GreengrassService service, State was, State newState) -> {
+        GlobalStateChangeListener listener = (GreengrassService service, State was, State newState) -> {
             if (service.getName().equals(SMBridge.SERVICE_NAME) && service.getState().equals(State.RUNNING)) {
                 bridgeRunning.countDown();
             }

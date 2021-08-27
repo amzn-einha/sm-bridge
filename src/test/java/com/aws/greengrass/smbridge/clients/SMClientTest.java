@@ -48,6 +48,13 @@ public class SMClientTest {
     }
 
     @Test
+    void WHEN_call_sm_client_start_THEN_sets_default_stream() throws Exception{
+        SMClient smClient = new SMClient(mockTopics, mockStreamDefinition, mockSmClient);
+        smClient.start();
+        Assertions.assertEquals(smClient.getDefaultStreamDefinition().getStrategyOnFull(), StrategyOnFull.RejectNewData);
+    }
+
+    @Test
     void GIVEN_sm_client_WHEN_publish_AND_stream_exists_THEN_publish() throws Exception {
         when(mockSmClient.describeMessageStream("mqttToStreamDefaultStreamName")).thenReturn(new MessageStreamInfo());
 

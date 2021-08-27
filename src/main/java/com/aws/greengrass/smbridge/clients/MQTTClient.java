@@ -236,6 +236,7 @@ public class MQTTClient {
         }
         //TODO: persistent session could be used
         connOpts.setCleanSession(true);
+
         if (serverUri.startsWith("ssl")) {
             SSLSocketFactory ssf = mqttClientKeyStore.getSSLSocketFactory();
             connOpts.setSocketFactory(ssf);
