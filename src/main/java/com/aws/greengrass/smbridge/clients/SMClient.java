@@ -5,27 +5,30 @@
 
 package com.aws.greengrass.smbridge.clients;
 
+import com.amazonaws.greengrass.streammanager.client.StreamManagerClient;
 import com.amazonaws.greengrass.streammanager.client.StreamManagerClientFactory;
+import com.amazonaws.greengrass.streammanager.client.config.StreamManagerClientConfig;
+import com.amazonaws.greengrass.streammanager.client.config.StreamManagerServerInfo;
 import com.amazonaws.greengrass.streammanager.client.exception.StreamManagerException;
 import com.amazonaws.greengrass.streammanager.model.MessageStreamDefinition;
 import com.amazonaws.greengrass.streammanager.model.StrategyOnFull;
 import com.aws.greengrass.config.Topics;
 import com.aws.greengrass.logging.api.Logger;
 import com.aws.greengrass.logging.impl.LogManager;
+import com.aws.greengrass.smbridge.StreamDefinition;
 import com.aws.greengrass.smbridge.StreamMessage;
 import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-
 import javax.inject.Inject;
-import java.util.List;
 
 public class SMClient {
     private static final Logger LOGGER = LogManager.getLogger(SMClient.class);
 
     private StreamManagerClient streamManagerClient;
+    @SuppressWarnings("PMD.ImmutableField")
     private AtomicReference<StreamDefinition> streamDefinition = new AtomicReference<>();
     @Getter(AccessLevel.PACKAGE) // Let the unit test inspect this value
     private MessageStreamDefinition defaultStreamDefinition;
@@ -74,7 +77,7 @@ public class SMClient {
 
     private Optional<MessageStreamDefinition> findStreamDefinition(String streamName) {
         for (MessageStreamDefinition messageStreamDefinition : streamDefinition.get().getList()) {
-            if (messageStreamDefinition.getName() == streamName) {
+            if (messageStreamDefinition.getName().trim().equals(streamName.trim())) {
                 return Optional.of(messageStreamDefinition);
             }
         }
@@ -87,6 +90,7 @@ public class SMClient {
      * @param  message            encapsulates a stream name and byte-wise payload
      * @throws SMClientException  thrown if encounters an error at any point
      */
+    @SuppressWarnings("PMD.AvoidDuplicateLiterals")
     public void publish(StreamMessage message) throws SMClientException {
         try {
             if (!checkStreamExists(message.getStream())) {
@@ -105,6 +109,7 @@ public class SMClient {
                 }
                 streamManagerClient.createMessageStream(newStream.get());
                 LOGGER.atInfo().kv("Stream", message.getStream()).log("Created new stream");
+                LOGGER.atDebug().kv("Definition", newStream.get().toString()).log("New stream");
             }
         } catch (StreamManagerException e) {
             LOGGER.atError().kv("Stream", message.getStream()).log("Unable to create stream");
@@ -124,31 +129,11 @@ public class SMClient {
 
     private boolean checkStreamExists(String stream) {
         try {
-            MessageStreamInfo msi = smClient.describeMessageStream(stream);
-            return true;
+            // Return type: MessageStreamInfo
+            streamManagerClient.describeMessageStream(stream);
         } catch (StreamManagerException e) {
             return false;
         }
-    }
-
-    private void updateStream(MessageStreamDefinition msd) throws StreamManagerException {
-        MessageStreamInfo messageStreamInfo;
-        messageStreamInfo = smClient.describeMessageStream(msd.getName());
-
-        smClient.updateMessageStream(
-                messageStreamInfo.getDefinition()
-                        .withMaxSize(msd.getMaxSize())
-                        .withStreamSegmentSize(msd.getStreamSegmentSize())
-                        .withTimeToLiveMillis(msd.getTimeToLiveMillis())
-                        .withStrategyOnFull(msd.getStrategyOnFull())
-                        .withPersistence(msd.getPersistence())
-                        .withFlushOnWrite(msd.getFlushOnWrite())
-                        .withExportDefinition(null)
-
-        );
-    }
-
-    private void createStream(MessageStreamDefinition msd) throws StreamManagerException {
-        smClient.createMessageStream(msd);
+        return true;
     }
 }

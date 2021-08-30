@@ -41,6 +41,6 @@ public class Metadata {
     }
 
     public boolean isEmpty() {
-        return (timestamp == null && topic == null);
+        return timestamp == null && topic == null;
     }
 }

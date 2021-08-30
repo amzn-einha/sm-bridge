@@ -12,10 +12,6 @@ import com.aws.greengrass.smbridge.clients.SMClient;
 import com.aws.greengrass.smbridge.clients.SMClientException;
 import org.eclipse.paho.client.mqttv3.MqttTopic;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +37,7 @@ public class MessageBridge {
     // append-values.
     // Example:
     // "/sourceTopic1" -> [{"/sourceTopic1", "outputStream1", false, true}]
+    @SuppressWarnings("PMD.ImmutableField")
     private AtomicReference<Map<String, List<TopicMapping.MappingEntry>>> sourceDestinationMap =
             new AtomicReference<>(new HashMap<>());
 
@@ -152,11 +149,6 @@ public class MessageBridge {
         LOGGER.atDebug().kv("topicMapping", sourceDestinationMap).log("Processed mapping");
     }
 
-    public void addOrReplaceMqttClient(MQTTClient mqttClient){
-        this.mqttClient = mqttClient;
-        updateSubscriptionsForClient(mqttClient);
-    }
-
     private synchronized void updateSubscriptionsForClient(MQTTClient mqttClient) {
         Set<String> topicsToSubscribe;
         if (sourceDestinationMap == null) {
@@ -164,7 +156,7 @@ public class MessageBridge {
         } else {
             topicsToSubscribe = new HashSet<>(sourceDestinationMap.get().keySet());
         }
-
+        topicsToSubscribe.add(SMBridge.RESERVED_TOPIC);
         LOGGER.atDebug().kv("topics", topicsToSubscribe).log("Updating subscriptions");
 
         mqttClient.updateSubscriptions(topicsToSubscribe, message -> handleMessage(message));
